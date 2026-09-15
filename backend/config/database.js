@@ -27,7 +27,34 @@ mysqlPool = mysql.createPool({
 });
 
 async function initSQLite() {
-  const SQL = await initSqlJs();
+  const wasmCandidates = [
+    path.join(__dirname, 'sql-wasm.wasm'),
+    path.join(__dirname, '../sql-wasm.wasm'),
+    path.join(__dirname, '../../sql-wasm.wasm'),
+    path.join(process.cwd(), 'backend/config/sql-wasm.wasm'),
+    path.join(process.cwd(), 'backend/sql-wasm.wasm'),
+    path.join(process.cwd(), 'sql-wasm.wasm'),
+    path.join('/var/task/backend/config/sql-wasm.wasm'),
+    path.join('/var/task/backend/sql-wasm.wasm'),
+    path.join('/var/task/sql-wasm.wasm')
+  ];
+
+  let wasmPath = null;
+  for (const candidate of wasmCandidates) {
+    if (fs.existsSync(candidate)) {
+      wasmPath = candidate;
+      break;
+    }
+  }
+
+  let SQL;
+  if (wasmPath) {
+    SQL = await initSqlJs({
+      locateFile: () => wasmPath
+    });
+  } else {
+    SQL = await initSqlJs();
+  }
   let buffer;
   if (fs.existsSync(DB_FILE)) {
     try {
