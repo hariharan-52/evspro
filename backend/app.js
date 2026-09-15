@@ -41,8 +41,16 @@ if (!fs.existsSync(uploadsDir)) {
 app.use('/uploads', express.static(uploadsDir));
 app.use('/api/uploads', express.static(uploadsDir));
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Root & Health check endpoints
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'EcoDonate Backend API Service',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
     message: 'EcoDonate API is operational',
@@ -51,17 +59,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/donations', donationRoutes);
-app.use('/api/recycling', recyclingRoutes);
-app.use('/api/ngos', ngoRoutes);
-app.use('/api/scrap-dealers', scrapDealerRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/impact', impactRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/classify', classifyRoutes);
+// API Routes (support both /api/* and /* paths for flexible proxying)
+app.use(['/api/auth', '/auth'], authRoutes);
+app.use(['/api/users', '/users'], userRoutes);
+app.use(['/api/donations', '/donations'], donationRoutes);
+app.use(['/api/recycling', '/recycling'], recyclingRoutes);
+app.use(['/api/ngos', '/ngos'], ngoRoutes);
+app.use(['/api/scrap-dealers', '/scrap-dealers'], scrapDealerRoutes);
+app.use(['/api/admin', '/admin'], adminRoutes);
+app.use(['/api/impact', '/impact'], impactRoutes);
+app.use(['/api/notifications', '/notifications'], notificationRoutes);
+app.use(['/api/classify', '/classify'], classifyRoutes);
 
 // Global Error Handler
 app.use(errorHandler);
