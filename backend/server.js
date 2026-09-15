@@ -8,3 +8,6 @@ app.listen(PORT, async () => {
   await testConnection();
 });
 
+module.exports = app;
+
+
