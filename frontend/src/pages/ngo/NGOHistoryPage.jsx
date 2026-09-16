@@ -312,16 +312,18 @@ const NGOHistoryPage = () => {
             <div className="p-6 overflow-y-auto space-y-6">
               {/* Photo Showcase */}
               <div className="relative rounded-xl overflow-hidden bg-gray-950/10 border border-gray-200">
-                <img
-                  src={getItemImageUrl(selectedItem.image, selectedItem.category)}
+                <ItemImage
+                  src={selectedItem.image}
+                  category={selectedItem.category}
                   alt={selectedItem.item_name}
-                  className="w-full h-64 object-cover sm:object-contain"
+                  title={selectedItem.item_name}
+                  subtitle={`Receipt Ref #${selectedItem.request_id} • Donor: ${selectedItem.donor_name || 'Donor'}`}
+                  condition={selectedItem.condition_state}
+                  quantity={selectedItem.quantity}
+                  className="w-full h-64 object-cover sm:object-contain cursor-pointer"
+                  containerClassName="w-full block"
                 />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5">
-                  <Package size={14} />
-                  <span>Received Item Photo</span>
-                </div>
-                <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-xs text-gray-900 px-3 py-1 rounded-lg text-xs font-bold shadow-xs">
+                <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-xs text-gray-900 px-3 py-1 rounded-lg text-xs font-bold shadow-xs pointer-events-none">
                   {selectedItem.quantity} unit(s) &bull; {selectedItem.condition_state || 'Good'}
                 </div>
               </div>

@@ -148,10 +148,16 @@ const AdminDonationsPage = () => {
             </div>
             <div className="p-6 overflow-y-auto space-y-4">
               <div className="relative rounded-xl overflow-hidden bg-gray-900/5 border border-gray-200">
-                <img
-                  src={getItemImageUrl(selectedDonation.image, selectedDonation.category)}
+                <ItemImage
+                  src={selectedDonation.image}
+                  category={selectedDonation.category}
                   alt={selectedDonation.item_name}
-                  className="w-full h-64 object-cover sm:object-contain bg-gray-950/10"
+                  title={selectedDonation.item_name}
+                  subtitle={`Ref #${selectedDonation.request_id} • Donor: ${selectedDonation.donor_name || 'Donor'}`}
+                  condition={selectedDonation.condition_state}
+                  quantity={selectedDonation.quantity}
+                  className="w-full h-64 object-cover sm:object-contain bg-gray-950/10 cursor-pointer"
+                  containerClassName="w-full block"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-xl border border-gray-100">

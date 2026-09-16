@@ -173,10 +173,16 @@ const NGOAcceptedPage = () => {
             </div>
             <div className="p-6 overflow-y-auto space-y-4">
               <div className="relative rounded-xl overflow-hidden bg-gray-900/5 border border-gray-200">
-                <img
-                  src={getItemImageUrl(selectedReq.image, selectedReq.category)}
+                <ItemImage
+                  src={selectedReq.image}
+                  category={selectedReq.category}
                   alt={selectedReq.item_name}
-                  className="w-full h-60 object-cover sm:object-contain bg-gray-950/10"
+                  title={selectedReq.item_name}
+                  subtitle={`Ref #${selectedReq.request_id} • Donor: ${selectedReq.donor_name || 'Donor'}`}
+                  condition={selectedReq.condition_state}
+                  quantity={selectedReq.quantity}
+                  className="w-full h-60 object-cover sm:object-contain bg-gray-950/10 cursor-pointer"
+                  containerClassName="w-full block"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-xl border border-gray-100">

@@ -21,6 +21,7 @@ mysqlPool = mysql.createPool({
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'password',
   database: process.env.DB_NAME || 'ecodonate',
+  connectTimeout: 1500,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0

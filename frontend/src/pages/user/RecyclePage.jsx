@@ -71,6 +71,7 @@ const RecyclePage = () => {
         pickup_date: formData.pickupDate || null,
         ai_prediction: aiResult ? aiResult.detected : null,
         ai_confidence: aiResult ? aiResult.confidence : null,
+        image_url: typeof formData.image === 'string' ? formData.image : undefined
       };
 
       if (formData.image instanceof File) {
@@ -112,7 +113,11 @@ const RecyclePage = () => {
             </h3>
             
             <div className="mb-6">
-              <ImageUpload onImageSelect={handleImageSelect} label="Upload Waste Photo for AI Detection" />
+              <ImageUpload 
+                onImageSelect={handleImageSelect} 
+                category={formData.wasteCategory}
+                label="Upload Waste Photo for AI Detection" 
+              />
             </div>
 
             {aiAnalyzing && (

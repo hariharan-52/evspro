@@ -232,15 +232,16 @@ const DealerRequestsPage = () => {
             <div className="p-6 overflow-y-auto space-y-6">
               {/* Scrap Material Photo Showcase */}
               <div className="relative rounded-xl overflow-hidden bg-gray-900/5 border border-gray-200">
-                <img
-                  src={getItemImageUrl(selectedReq.image, selectedReq.waste_category)}
+                <ItemImage
+                  src={selectedReq.image}
+                  category={selectedReq.waste_category}
                   alt={selectedReq.waste_category}
-                  className="w-full h-64 object-cover sm:object-contain bg-gray-950/10"
+                  title={`Scrap ${selectedReq.waste_category}`}
+                  subtitle={`Ref #${selectedReq.request_id} • User: ${selectedReq.user_name || 'User'}`}
+                  quantity={`${selectedReq.quantity} ${selectedReq.quantity_unit || 'kg'}`}
+                  className="w-full h-64 object-cover sm:object-contain bg-gray-950/10 cursor-pointer"
+                  containerClassName="w-full block"
                 />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5">
-                  <ImageIcon size={14} />
-                  <span>Scrap Photo from User</span>
-                </div>
                 {selectedReq.ai_prediction && (
                   <div className="absolute top-3 right-3 bg-purple-600/90 backdrop-blur-xs text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs">
                     <Sparkles size={12} />

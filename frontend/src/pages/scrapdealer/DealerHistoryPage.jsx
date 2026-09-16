@@ -324,15 +324,16 @@ const DealerHistoryPage = () => {
             <div className="p-6 overflow-y-auto space-y-6">
               {/* Photo Showcase */}
               <div className="relative rounded-xl overflow-hidden bg-gray-950/10 border border-gray-200">
-                <img
-                  src={getItemImageUrl(selectedItem.image, selectedItem.waste_category)}
+                <ItemImage
+                  src={selectedItem.image}
+                  category={selectedItem.waste_category}
                   alt={selectedItem.waste_category}
-                  className="w-full h-64 object-cover sm:object-contain"
+                  title={`Scrap ${selectedItem.waste_category}`}
+                  subtitle={`Log Ref #${selectedItem.request_id} • User: ${selectedItem.user_name || 'User'}`}
+                  quantity={`${selectedItem.quantity} ${selectedItem.quantity_unit || 'kg'}`}
+                  className="w-full h-64 object-cover sm:object-contain cursor-pointer"
+                  containerClassName="w-full block"
                 />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5">
-                  <Recycle size={14} />
-                  <span>Collected Scrap Photo</span>
-                </div>
                 {selectedItem.ai_prediction && (
                   <div className="absolute top-3 right-3 bg-purple-600/90 backdrop-blur-xs text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs">
                     <Sparkles size={12} />

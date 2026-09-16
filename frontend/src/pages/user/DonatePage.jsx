@@ -48,6 +48,7 @@ const DonatePage = () => {
         pincode: formData.pincode,
         pickup_date: formData.pickupDate || null,
         additional_notes: formData.notes || null,
+        image_url: typeof formData.image === 'string' ? formData.image : undefined
       };
 
       if (formData.image instanceof File) {
@@ -87,7 +88,11 @@ const DonatePage = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-100">Item Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <ImageUpload onImageSelect={handleImageSelect} label="Item Photo (Required)" />
+                <ImageUpload 
+                  onImageSelect={handleImageSelect} 
+                  category={formData.category} 
+                  label="Item Photo (Required)" 
+                />
               </div>
               
               <div className="md:col-span-2">

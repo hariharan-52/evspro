@@ -234,16 +234,18 @@ const NGORequestsPage = () => {
             <div className="p-6 overflow-y-auto space-y-6">
               {/* Item Visual Photo Showcase */}
               <div className="relative rounded-xl overflow-hidden bg-gray-900/5 border border-gray-200">
-                <img
-                  src={getItemImageUrl(selectedReq.image, selectedReq.category)}
+                <ItemImage
+                  src={selectedReq.image}
+                  category={selectedReq.category}
                   alt={selectedReq.item_name}
-                  className="w-full h-64 object-cover sm:object-contain bg-gray-950/10"
+                  title={selectedReq.item_name}
+                  subtitle={`Ref #${selectedReq.request_id} • Donor: ${selectedReq.donor_name || 'Donor'}`}
+                  condition={selectedReq.condition_state}
+                  quantity={selectedReq.quantity}
+                  className="w-full h-64 object-cover sm:object-contain bg-gray-950/10 cursor-pointer"
+                  containerClassName="w-full block"
                 />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5">
-                  <ImageIcon size={14} />
-                  <span>Item Photo from Donor</span>
-                </div>
-                <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-gray-900 px-3 py-1 rounded-lg text-xs font-bold shadow-xs">
+                <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-gray-900 px-3 py-1 rounded-lg text-xs font-bold shadow-xs pointer-events-none">
                   {selectedReq.category} &bull; {selectedReq.condition_state || 'Good'} Condition
                 </div>
               </div>

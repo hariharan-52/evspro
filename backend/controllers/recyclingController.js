@@ -15,7 +15,7 @@ const createRecycling = async (req, res, next) => {
     const pickup_date = req.body.pickup_date || req.body.pickupDate || null;
     const ai_prediction = req.body.ai_prediction || null;
     const ai_confidence = req.body.ai_confidence || null;
-    const image = req.file ? req.file.filename : (req.body.image_url || null);
+    const image = req.file ? req.file.filename : (req.body.image_url || req.body.image || null);
     const request_id = generateId('REC');
     
     if (!waste_category || !address || !city || !pincode) {

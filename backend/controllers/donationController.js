@@ -15,7 +15,7 @@ const createDonation = async (req, res, next) => {
     const pincode = req.body.pincode;
     const pickup_date = req.body.pickup_date || req.body.pickupDate || null;
     const additional_notes = req.body.additional_notes || req.body.notes || null;
-    const image = req.file ? req.file.filename : (req.body.image_url || null);
+    const image = req.file ? req.file.filename : (req.body.image_url || req.body.image || null);
     const request_id = generateId('DON');
     
     if (!item_name || !category || !address || !city || !pincode) {
