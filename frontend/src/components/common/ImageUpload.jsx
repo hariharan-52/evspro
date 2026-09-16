@@ -1,23 +1,54 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   UploadCloud, X, Image as ImageIcon, Camera, Link as LinkIcon, 
-  Sparkles, Check, RefreshCw, ZoomIn, Eye, Layers
+  Check, RefreshCw, ZoomIn
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { CATEGORY_PRESET_IMAGES } from '../../utils/helpers';
+
+// Client-side image compressor: keeps image quality crisp while keeping payload lightweight for serverless/DB storage
+const compressImage = (file, maxWidth = 1200, quality = 0.85) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => resolve(event.target.result); // Fallback to raw dataUrl if canvas fails
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
 
 const ImageUpload = ({ 
   onImageSelect, 
   previewUrl, 
   label = "Item Photo (Required)", 
-  category = 'Other',
   required = false
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState(previewUrl || null);
-  const [activeMode, setActiveMode] = useState('upload'); // 'upload' | 'preset' | 'camera' | 'url'
+  const [activeMode, setActiveMode] = useState('upload'); // 'upload' | 'camera' | 'url'
   const [urlInput, setUrlInput] = useState('');
-  const [sourceType, setSourceType] = useState(previewUrl ? 'existing' : null); // 'file' | 'preset' | 'camera' | 'url'
+  const [sourceType, setSourceType] = useState(previewUrl ? 'existing' : null);
+  const [processing, setProcessing] = useState(false);
   
   // Camera state
   const [cameraActive, setCameraActive] = useState(false);
@@ -73,24 +104,34 @@ const ImageUpload = ({
     }
   };
 
-  const processFile = (file) => {
+  const processFile = async (file) => {
     if (!file) return;
     if (!file.type.match('image.*')) {
-      toast.error('Please upload an image file (jpeg, png, webp, etc)');
+      toast.error('Please upload an image file (JPEG, PNG, WEBP, etc)');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('Image size must be less than 8MB');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result);
+    setProcessing(true);
+    try {
+      const compressedDataUrl = await compressImage(file);
+      setPreview(compressedDataUrl);
       setSourceType('file');
-      if (onImageSelect) onImageSelect(file, reader.result);
-    };
-    reader.readAsDataURL(file);
+      if (onImageSelect) onImageSelect(file, compressedDataUrl);
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result);
+        setSourceType('file');
+        if (onImageSelect) onImageSelect(file, reader.result);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleDrop = (e) => {
@@ -120,14 +161,6 @@ const ImageUpload = ({
     stopCamera();
     if (inputRef.current) inputRef.current.value = "";
     if (onImageSelect) onImageSelect(null, null);
-  };
-
-  // Preset Selection
-  const handleSelectPreset = (presetUrl, label) => {
-    setPreview(presetUrl);
-    setSourceType('preset');
-    if (onImageSelect) onImageSelect(presetUrl, presetUrl);
-    toast.success(`Selected "${label}" sample item photo`);
   };
 
   // Camera Capture
@@ -166,14 +199,14 @@ const ImageUpload = ({
     canvas.toBlob((blob) => {
       if (blob) {
         const file = new File([blob], `camera-snap-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        const dataUrl = canvas.toDataURL('image/jpeg');
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         setPreview(dataUrl);
         setSourceType('camera');
         stopCamera();
         if (onImageSelect) onImageSelect(file, dataUrl);
         toast.success('Live photo captured successfully!');
       }
-    }, 'image/jpeg', 0.9);
+    }, 'image/jpeg', 0.85);
   };
 
   // URL Input
@@ -189,8 +222,6 @@ const ImageUpload = ({
     toast.success('Custom image URL applied!');
   };
 
-  const currentPresets = CATEGORY_PRESET_IMAGES[category] || CATEGORY_PRESET_IMAGES['Furniture'] || [];
-
   return (
     <div className="w-full space-y-2.5">
       <div className="flex items-center justify-between">
@@ -199,7 +230,7 @@ const ImageUpload = ({
         </label>
         {preview && (
           <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-md font-medium border border-green-200">
-            Photo Ready {sourceType && `(${sourceType})`}
+            Photo Attached
           </span>
         )}
       </div>
@@ -217,7 +248,7 @@ const ImageUpload = ({
           {/* Top action pill */}
           <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-xs text-white px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs">
             <Check size={14} className="text-green-400" />
-            <span>Photo Selected</span>
+            <span>Photo Attached</span>
           </div>
 
           {/* Clear button */}
@@ -225,7 +256,7 @@ const ImageUpload = ({
             type="button"
             onClick={clearImage}
             className="absolute top-3 right-3 p-1.5 bg-black/70 hover:bg-red-600 text-white rounded-full transition-colors shadow-md"
-            title="Remove and choose another photo"
+            title="Remove photo"
           >
             <X size={16} />
           </button>
@@ -238,7 +269,7 @@ const ImageUpload = ({
               className="px-3 py-1.5 bg-white/90 hover:bg-white text-gray-900 rounded-lg text-xs font-bold shadow-md transition-all flex items-center gap-1"
             >
               <RefreshCw size={13} />
-              Change Photo
+              Replace Photo
             </button>
           </div>
         </div>
@@ -255,16 +286,6 @@ const ImageUpload = ({
               }`}
             >
               <UploadCloud size={14} /> Upload File
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setActiveMode('preset'); stopCamera(); }}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                activeMode === 'preset' ? 'bg-white text-green-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Sparkles size={14} className="text-green-600" /> Quick Sample Photos
             </button>
 
             <button
@@ -307,10 +328,10 @@ const ImageUpload = ({
                 <UploadCloud className={`w-6 h-6 ${dragActive ? 'text-green-600' : 'text-gray-500'}`} />
               </div>
               <p className="text-sm font-semibold text-gray-800 text-center">
-                Click to browse photo or drag & drop here
+                {processing ? 'Processing photo...' : 'Click to browse photo or drag & drop here'}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                PNG, JPG, JPEG or WEBP (Max 5MB) &bull; Paste with <kbd className="px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded text-[10px] font-mono">Ctrl+V</kbd>
+                PNG, JPG, JPEG or WEBP (Max 8MB) &bull; Paste with <kbd className="px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded text-[10px] font-mono">Ctrl+V</kbd>
               </p>
               <input 
                 ref={inputRef}
@@ -322,41 +343,7 @@ const ImageUpload = ({
             </div>
           )}
 
-          {/* Mode 2: Quick Category Sample Presets */}
-          {activeMode === 'preset' && (
-            <div className="bg-green-50/50 border border-green-200/80 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-green-900">
-                  <Sparkles size={15} className="text-green-600" />
-                  <span>Select an Authentic Photo for "{category}"</span>
-                </div>
-                <span className="text-[11px] text-green-700">1-click select</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {currentPresets.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSelectPreset(preset.url, preset.label)}
-                    className="group relative rounded-xl overflow-hidden border border-green-200 bg-white hover:border-green-600 hover:shadow-md transition-all text-left flex flex-col"
-                  >
-                    <img 
-                      src={preset.url} 
-                      alt={preset.label} 
-                      className="w-full h-24 object-cover group-hover:scale-105 transition-transform" 
-                    />
-                    <div className="p-1.5 bg-white flex-1 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-gray-800 line-clamp-1">
-                        {preset.label}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Mode 3: Live Camera Snapper */}
+          {/* Mode 2: Live Camera Snapper */}
           {activeMode === 'camera' && (
             <div className="bg-gray-900 rounded-2xl overflow-hidden p-4 text-white space-y-3 border border-gray-800">
               <div className="flex items-center justify-between text-xs">
@@ -394,7 +381,7 @@ const ImageUpload = ({
             </div>
           )}
 
-          {/* Mode 4: Direct URL Input */}
+          {/* Mode 3: Direct URL Input */}
           {activeMode === 'url' && (
             <div className="bg-purple-50/50 border border-purple-200/80 rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">

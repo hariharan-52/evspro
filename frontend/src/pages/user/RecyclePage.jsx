@@ -33,8 +33,8 @@ const RecyclePage = () => {
   };
 
   const handleImageSelect = (file, dataUrl) => {
-    setFormData({ ...formData, image: file });
-    if (file) {
+    setFormData({ ...formData, image: dataUrl || file });
+    if (file || dataUrl) {
       simulateAiClassification();
     } else {
       setAiResult(null);
@@ -71,6 +71,7 @@ const RecyclePage = () => {
         pickup_date: formData.pickupDate || null,
         ai_prediction: aiResult ? aiResult.detected : null,
         ai_confidence: aiResult ? aiResult.confidence : null,
+        image: typeof formData.image === 'string' ? formData.image : undefined,
         image_url: typeof formData.image === 'string' ? formData.image : undefined
       };
 
@@ -115,7 +116,6 @@ const RecyclePage = () => {
             <div className="mb-6">
               <ImageUpload 
                 onImageSelect={handleImageSelect} 
-                category={formData.wasteCategory}
                 label="Upload Waste Photo for AI Detection" 
               />
             </div>

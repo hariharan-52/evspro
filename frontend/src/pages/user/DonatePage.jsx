@@ -29,8 +29,8 @@ const DonatePage = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleImageSelect = (file) => {
-    setFormData({ ...formData, image: file });
+  const handleImageSelect = (file, dataUrl) => {
+    setFormData({ ...formData, image: dataUrl || file });
   };
 
   const handleSubmit = async (e) => {
@@ -48,6 +48,7 @@ const DonatePage = () => {
         pincode: formData.pincode,
         pickup_date: formData.pickupDate || null,
         additional_notes: formData.notes || null,
+        image: typeof formData.image === 'string' ? formData.image : undefined,
         image_url: typeof formData.image === 'string' ? formData.image : undefined
       };
 
@@ -90,7 +91,6 @@ const DonatePage = () => {
               <div className="md:col-span-2">
                 <ImageUpload 
                   onImageSelect={handleImageSelect} 
-                  category={formData.category} 
                   label="Item Photo (Required)" 
                 />
               </div>

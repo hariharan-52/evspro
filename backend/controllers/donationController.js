@@ -14,8 +14,19 @@ const createDonation = async (req, res, next) => {
     const city = req.body.city;
     const pincode = req.body.pincode;
     const pickup_date = req.body.pickup_date || req.body.pickupDate || null;
-    const additional_notes = req.body.additional_notes || req.body.notes || null;
-    const image = req.file ? req.file.filename : (req.body.image_url || req.body.image || null);
+    let image = req.body.image_url || req.body.image || null;
+    if (req.file) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const ext = path.extname(req.file.originalname).replace('.', '') || 'jpeg';
+        const mime = req.file.mimetype || `image/${ext}`;
+        image = `data:${mime};base64,${fileBuffer.toString('base64')}`;
+      } catch (e) {
+        image = req.file.filename;
+      }
+    }
     const request_id = generateId('DON');
     
     if (!item_name || !category || !address || !city || !pincode) {
