@@ -7,6 +7,7 @@ const { createRecycling, getRecyclingRequests, getRecyclingById, updateRecycling
 
 router.post('/', auth, requireRole('user'), uploadSingle('image'), createRecycling);
 router.get('/', auth, getRecyclingRequests);
+router.get('/my', auth, getRecyclingRequests);
 router.get('/:id', auth, getRecyclingById);
 router.patch('/:id/status', auth, requireRole('admin', 'scrapdealer'), updateRecyclingStatus);
 

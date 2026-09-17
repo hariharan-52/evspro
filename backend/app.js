@@ -21,7 +21,7 @@ const classifyRoutes = require('./routes/classify');
 const app = express();
 
 // Enable CORS for frontend requests
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
