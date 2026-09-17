@@ -28,16 +28,25 @@ const AdminDashboard = () => {
       ]);
       setStats(statsRes.data);
 
-      const donMap = {};
-      const recMap = {};
-      (monthlyRes.data.donations || []).forEach(d => { donMap[d.month] = d.count; });
-      (monthlyRes.data.recycling || []).forEach(r => { recMap[r.month] = r.count; });
-      const months = [...new Set([...Object.keys(donMap), ...Object.keys(recMap)])].sort();
-      setMonthlyData(months.map(m => ({
-        name: m.slice(5),
-        donations: donMap[m] || 0,
-        recycling: recMap[m] || 0,
-      })));
+      if (Array.isArray(monthlyRes.data)) {
+        setMonthlyData(monthlyRes.data.map(m => ({
+          name: m.name || m.key || '',
+          donations: m.donations || 0,
+          recycling: m.recycling || 0,
+          weight: m.recycling_weight || 0
+        })));
+      } else {
+        const donMap = {};
+        const recMap = {};
+        (monthlyRes.data?.donations || []).forEach(d => { donMap[d.month] = d.count; });
+        (monthlyRes.data?.recycling || []).forEach(r => { recMap[r.month] = r.count; });
+        const months = [...new Set([...Object.keys(donMap), ...Object.keys(recMap)])].sort();
+        setMonthlyData(months.map(m => ({
+          name: m.slice(5),
+          donations: donMap[m] || 0,
+          recycling: recMap[m] || 0,
+        })));
+      }
 
       setCategoryData(categoryRes.data || []);
       setPendingItems({

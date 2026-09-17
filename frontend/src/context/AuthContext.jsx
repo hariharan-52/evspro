@@ -12,8 +12,11 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const verifyToken = async () => {
-      if (!token) {
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
         setLoading(false);
+        setIsAuthenticated(false);
+        setUser(null);
         return;
       }
       try {
@@ -21,15 +24,17 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         setIsAuthenticated(true);
       } catch (error) {
+        console.error('Session validation failed:', error);
         localStorage.removeItem('token');
         setToken(null);
+        setUser(null);
         setIsAuthenticated(false);
       } finally {
         setLoading(false);
       }
     };
     verifyToken();
-  }, [token]);
+  }, []);
 
   const login = async (email, password) => {
     try {
@@ -38,10 +43,12 @@ export const AuthProvider = ({ children }) => {
       setToken(data.token);
       setUser(data.user);
       setIsAuthenticated(true);
+      setLoading(false);
       toast.success('Login successful!');
       return data;
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      const msg = error.response?.data?.message || 'Login failed';
+      toast.error(msg);
       throw error;
     }
   };

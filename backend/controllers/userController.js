@@ -6,34 +6,35 @@ const getUsers = async (req, res, next) => {
     let query = 'SELECT id, name, email, phone, role, city, state, status, created_at FROM users WHERE 1=1';
     const params = [];
 
-    if (search) {
+    if (search && search.trim()) {
       query += ' AND (name LIKE ? OR email LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      params.push(`%${search.trim()}%`, `%${search.trim()}%`);
     }
-    if (role) {
+    if (role && role !== 'all' && role !== 'ALL') {
       query += ' AND role = ?';
       params.push(role);
     }
-    if (status) {
+    if (status && status !== 'all' && status !== 'ALL') {
       query += ' AND status = ?';
       params.push(status);
     }
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const countParams = [...params];
+
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), offset);
+    params.push(parseInt(limit, 10), offset);
 
     const [users] = await pool.query(query, params);
 
     // Count total for pagination
     let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
-    const countParams = params.slice(0, params.length - 2); // Remove limit/offset
-    if (search) { countQuery += ' AND (name LIKE ? OR email LIKE ?)'; }
-    if (role) { countQuery += ' AND role = ?'; }
-    if (status) { countQuery += ' AND status = ?'; }
+    if (search && search.trim()) { countQuery += ' AND (name LIKE ? OR email LIKE ?)'; }
+    if (role && role !== 'all' && role !== 'ALL') { countQuery += ' AND role = ?'; }
+    if (status && status !== 'all' && status !== 'ALL') { countQuery += ' AND status = ?'; }
     const [[{ total }]] = await pool.query(countQuery, countParams);
 
-    res.json({ users, total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({ users, total: total || 0, page: parseInt(page, 10), limit: parseInt(limit, 10) });
   } catch (error) {
     next(error);
   }
