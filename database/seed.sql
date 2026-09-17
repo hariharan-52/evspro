@@ -46,5 +46,25 @@ INSERT INTO scrap_dealers (id, user_id, business_name, contact_person, registrat
 (2, 7, 'Hari Scrap Dealers', 'Hariharan Scrap', 'SCRAP555', '["Plastic","Paper","Metal","E-Waste","Glass"]', 'approved'),
 (3, 9, 'City Recyclers', 'Vinod Desai', 'SCRAP123', '["Paper","Cardboard","Glass"]', 'pending');
 
+INSERT INTO donations (id, request_id, user_id, ngo_id, item_name, category, description, condition_state, quantity, address, city, pincode, pickup_date, additional_notes, status) VALUES
+(1, 'DON-1001', 2, NULL, 'Winter Blankets & Sweaters', 'Clothes', '10 clean winter blankets and warm sweaters for the shelter.', 'Good', 10, '12 MG Road', 'Mumbai', '400001', '2026-09-25', 'Packed in 2 cartons. Call before arriving.', 'PENDING'),
+(2, 'DON-1002', 3, 2, 'CBSE Grade 10 & 12 Books', 'Books', 'Complete sets of textbooks and study materials for high school students.', 'Like New', 15, '24 Green Avenue', 'Chennai', '600001', '2026-09-22', 'Neatly packed and labelled.', 'ACCEPTED'),
+(3, 'DON-1003', 2, 1, 'Stainless Steel Utensils', 'Household', 'Kitchenware and food containers for community food distribution.', 'Good', 8, '12 MG Road', 'Mumbai', '400001', '2026-09-15', 'Sanitized before handover.', 'COMPLETED');
+
+INSERT INTO recycling_requests (id, request_id, user_id, scrap_dealer_id, waste_category, ai_prediction, ai_confidence, description, quantity, quantity_unit, address, city, pincode, pickup_date, status) VALUES
+(1, 'REC-2001', 2, NULL, 'Plastic', 'PET Bottles & Containers', 0.94, 'Clean sorted plastic bottles and containers ready for recycling.', 12.5, 'kg', '12 MG Road', 'Mumbai', '400001', '2026-09-26', 'PENDING'),
+(2, 'REC-2002', 3, 2, 'Metal', 'Aluminium & Copper Scrap', 0.91, 'Discarded aluminium frames and copper scrap wire from home renovation.', 18.0, 'kg', '24 Green Avenue', 'Chennai', '600001', '2026-09-23', 'ACCEPTED'),
+(3, 'REC-2003', 2, 1, 'E-Waste', 'Computer Motherboard & Circuit Boards', 0.96, 'Old broken circuit boards, wires, and power supplies for metal recovery.', 7.2, 'kg', '12 MG Road', 'Mumbai', '400001', '2026-09-14', 'COMPLETED');
+
+INSERT INTO impact_records (user_id, request_type, request_db_id, waste_weight_kg, items_count, impact_score, co2_saved_kg) VALUES
+(2, 'donation', 3, 5.0, 8, 40, 12.5),
+(2, 'recycling', 3, 7.2, 1, 55, 21.6);
+
+INSERT INTO notifications (user_id, title, message, type) VALUES
+(2, 'Donation Received', 'Your donation of Stainless Steel Utensils (DON-1003) was successfully completed. Thank you for your support!', 'donation'),
+(2, 'Recycling Collected', 'Your recycling request for E-Waste (REC-2003) has been completed and verified.', 'recycling'),
+(3, 'Donation Accepted', 'Hari NGO Foundation has accepted your donation of CBSE Grade 10 & 12 Books (DON-1002).', 'donation'),
+(3, 'Recycling Accepted', 'Hari Scrap Dealers accepted your recycling request for Metal scrap (REC-2002).', 'recycling');
+
 
 
