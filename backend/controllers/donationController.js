@@ -14,6 +14,7 @@ const createDonation = async (req, res, next) => {
     const city = req.body.city;
     const pincode = req.body.pincode;
     const pickup_date = req.body.pickup_date || req.body.pickupDate || null;
+    const additional_notes = req.body.additional_notes || req.body.additionalNotes || req.body.notes || null;
     let image = req.body.image_url || req.body.image || null;
     if (req.file) {
       try {
