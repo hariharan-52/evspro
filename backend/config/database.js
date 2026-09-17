@@ -238,64 +238,6 @@ async function initSQLite() {
       `);
     }
 
-    const donRes = sqliteDb.exec("SELECT COUNT(*) as c FROM donations");
-    const donCount = donRes[0]?.values[0][0] || 0;
-    if (donCount === 0) {
-      sqliteDb.run(`
-        INSERT INTO donations (id, request_id, user_id, ngo_id, item_name, category, description, condition_state, quantity, image, address, city, pincode, pickup_date, additional_notes, status, created_at)
-        VALUES
-        (1, 'DON-A1B2C3', 2, NULL, 'Solid Wood Study Desk & Ergonomic Chair', 'Furniture', 'Solid teak wood study desk with 3 drawers and an adjustable swivel chair. Very well maintained with minimal scratch marks.', 'Good', 1, 'mock-furniture.jpg', 'Flat 402, Sea Breeze Apt, Bandra West', 'Mumbai', '400050', '2026-09-20', 'Please call 15 minutes before arrival. Building has elevator access via rear entrance.', 'PENDING', datetime('now', '-2 days')),
-        (2, 'DON-D4E5F6', 3, 1, 'NCERT & Higher Secondary Reference Textbooks', 'Books', 'Complete set of Class 11 and 12 Physics, Chemistry, Mathematics textbooks along with competitive exam guidebooks.', 'Like New', 14, 'mock-books.jpg', '34 Brigade Road, Ashok Nagar', 'Bangalore', '560001', '2026-09-18', 'All books are neatly packed in two labelled waterproof cartons. Available for pickup after 5 PM on weekdays.', 'ACCEPTED', datetime('now', '-3 days')),
-        (3, 'DON-G7H8I9', 4, 1, 'Winter Blankets & Thermal Woolen Jackets', 'Clothes', 'Assorted adult winter jackets, fleece sweaters, and heavy woolen blankets. Cleaned, sanitized, and folded.', 'Good', 8, 'mock-clothes.jpg', '56 Anna Salai, Thousand Lights', 'Chennai', '600002', '2026-09-16', 'Security at gate will direct you to block C. Please ask for Amit Kumar.', 'RECEIVED', datetime('now', '-5 days')),
-        (4, 'DON-J1K2L3', 2, 1, 'LED Study Lamps & Extension Power Boards', 'Electronics', 'Two Philips 10W adjustable LED desk study lamps and two 4-socket surge protected spike strips. 100% operational.', 'Good', 2, 'mock-electronics.jpg', '12 MG Road, Fort', 'Mumbai', '400001', '2026-09-14', 'Tested working with original power adapters included in boxes.', 'COMPLETED', datetime('now', '-7 days'));
-
-        INSERT INTO request_status_history (request_type, request_db_id, status, updated_by, notes, created_at) VALUES
-        ('donation', 1, 'PENDING', 2, 'Donation request submitted by donor', datetime('now', '-2 days')),
-        ('donation', 2, 'PENDING', 3, 'Donation request submitted by donor', datetime('now', '-3 days')),
-        ('donation', 2, 'ACCEPTED', 5, 'Accepted by Green Earth NGO for pickup', datetime('now', '-2 days')),
-        ('donation', 3, 'PENDING', 4, 'Donation request submitted by donor', datetime('now', '-5 days')),
-        ('donation', 3, 'ACCEPTED', 5, 'Accepted by Green Earth NGO', datetime('now', '-4 days')),
-        ('donation', 3, 'RECEIVED', 5, 'Items safely received at NGO storage depot', datetime('now', '-3 days')),
-        ('donation', 4, 'PENDING', 2, 'Donation request submitted by donor', datetime('now', '-7 days')),
-        ('donation', 4, 'ACCEPTED', 5, 'Accepted by Green Earth NGO', datetime('now', '-6 days')),
-        ('donation', 4, 'RECEIVED', 5, 'Items inspected and verified', datetime('now', '-5 days')),
-        ('donation', 4, 'COMPLETED', 5, 'Items distributed to students at community learning center', datetime('now', '-4 days'));
-
-        INSERT INTO impact_records (user_id, request_type, request_db_id, items_count, impact_score, co2_saved_kg, created_at) VALUES
-        (4, 'donation', 3, 8, 40.0, 20.0, datetime('now', '-3 days')),
-        (2, 'donation', 4, 2, 10.0, 5.0, datetime('now', '-4 days'));
-
-        INSERT INTO recycling_requests (id, request_id, user_id, scrap_dealer_id, waste_category, description, quantity, quantity_unit, image, ai_prediction, ai_confidence, address, city, pincode, pickup_date, status, created_at)
-        VALUES
-        (1, 'REC-M3N4P5', 2, 1, 'Plastic', 'Crushed HDPE milk jugs and PET mineral water bottles bundled together.', 18.5, 'kg', 'mock-plastic.jpg', 'PET & HDPE Plastic Bottles', 94.5, '12 MG Road', 'Mumbai', '400001', '2026-09-19', 'ACCEPTED', datetime('now', '-1 days')),
-        (2, 'REC-Q6R7S8', 3, NULL, 'E-Waste', 'Old computer motherboards, RAM sticks, and power supply units.', 7.0, 'kg', 'mock-ewaste.jpg', 'Printed Circuit Boards (E-Waste)', 91.0, '34 Brigade Road', 'Bangalore', '560001', '2026-09-22', 'PENDING', datetime('now', '-2 days')),
-        (3, 'REC-P1Q2R3', 4, 1, 'Metal', 'Scrap aluminum window frames, beverage cans, and iron pipes from home renovation.', 42.0, 'kg', 'mock-metal.jpg', 'Aluminum & Iron Scrap', 96.0, '56 Anna Salai', 'Mumbai', '400093', '2026-09-15', 'COLLECTED', datetime('now', '-4 days')),
-        (4, 'REC-S4T5U6', 2, 1, 'Cardboard', 'Flattened corrugated cardboard packing cartons and shipping boxes.', 65.0, 'kg', 'mock-cardboard.jpg', 'Corrugated Cardboard', 98.0, '12 MG Road', 'Mumbai', '400001', '2026-09-12', 'COMPLETED', datetime('now', '-6 days')),
-        (5, 'REC-V7W8X9', 3, 1, 'E-Waste', 'Old CRT monitors, broken computer towers, copper coils, and cables.', 14.5, 'kg', 'mock-ewaste.jpg', 'Electronic Waste (E-Waste)', 92.5, '78 NGO Colony', 'Mumbai', '400050', '2026-09-10', 'COMPLETED', datetime('now', '-8 days'));
-
-        INSERT INTO request_status_history (request_type, request_db_id, status, updated_by, notes, created_at) VALUES
-        ('recycling', 1, 'PENDING', 2, 'Recycling request submitted by user', datetime('now', '-1 days')),
-        ('recycling', 1, 'ACCEPTED', 7, 'Accepted by Eco Scrap Traders for collection', datetime('now', '-1 days')),
-        ('recycling', 2, 'PENDING', 3, 'Recycling request submitted by user', datetime('now', '-2 days')),
-        ('recycling', 3, 'PENDING', 4, 'Recycling request submitted by user', datetime('now', '-4 days')),
-        ('recycling', 3, 'ACCEPTED', 7, 'Accepted by Eco Scrap Traders', datetime('now', '-3 days')),
-        ('recycling', 3, 'COLLECTED', 7, 'Scrap metal collected and weighed on digital scale', datetime('now', '-2 days')),
-        ('recycling', 4, 'PENDING', 2, 'Recycling request submitted by user', datetime('now', '-6 days')),
-        ('recycling', 4, 'ACCEPTED', 7, 'Accepted by Eco Scrap Traders', datetime('now', '-5 days')),
-        ('recycling', 4, 'COLLECTED', 7, 'Cardboard collected from premises', datetime('now', '-4 days')),
-        ('recycling', 4, 'COMPLETED', 7, 'Cardboard baled and shipped to paper recycling plant', datetime('now', '-3 days')),
-        ('recycling', 5, 'PENDING', 3, 'Recycling request submitted by user', datetime('now', '-8 days')),
-        ('recycling', 5, 'ACCEPTED', 7, 'Accepted by Eco Scrap Traders', datetime('now', '-7 days')),
-        ('recycling', 5, 'COLLECTED', 7, 'E-waste collected and logged', datetime('now', '-6 days')),
-        ('recycling', 5, 'COMPLETED', 7, 'Safely processed at certified e-waste recovery unit', datetime('now', '-5 days'));
-
-        INSERT INTO impact_records (user_id, request_type, request_db_id, waste_weight_kg, impact_score, co2_saved_kg, created_at) VALUES
-        (4, 'recycling', 3, 42.0, 84.0, 63.0, datetime('now', '-2 days')),
-        (2, 'recycling', 4, 65.0, 130.0, 97.5, datetime('now', '-3 days')),
-        (3, 'recycling', 5, 14.5, 29.0, 21.75, datetime('now', '-5 days'));
-      `);
-    }
-
     saveSQLite();
 }
 
