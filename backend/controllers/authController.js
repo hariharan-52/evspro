@@ -4,15 +4,28 @@ const { pool } = require('../config/database');
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role, address, city, state, pincode, ngo_name, registration_number, business_name, accepted_materials, contact_person, description } = req.body;
-    
+    const rawName = req.body.name || '';
+    const rawEmail = req.body.email || '';
+    const rawPhone = req.body.phone || '';
+    const rawPassword = req.body.password || '';
+    const role = (req.body.role || 'user').trim().toLowerCase();
+    const address = (req.body.address || '').trim();
+    const city = (req.body.city || '').trim();
+    const state = (req.body.state || '').trim();
+    const pincode = (req.body.pincode || '').trim();
+
+    const name = rawName.trim();
+    const email = rawEmail.trim().toLowerCase();
+    const phone = rawPhone.trim();
+    const password = rawPassword.trim();
+
     if (!name || !email || !password || !role) {
       return res.status(400).json({ message: 'Name, email, password, and role are required' });
     }
 
-    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    const [existing] = await pool.query('SELECT id FROM users WHERE LOWER(email) = ?', [email]);
     if (existing.length > 0) {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(400).json({ message: 'An account with this email address already exists. Please log in.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -26,14 +39,24 @@ const register = async (req, res, next) => {
     const userId = result.insertId;
 
     if (role === 'ngo') {
+      const ngo_name = req.body.ngo_name || name;
+      const contact_person = req.body.contact_person || req.body.contactPerson || name;
+      const registration_number = req.body.registration_number || req.body.registrationNumber || null;
+      const description = req.body.description || null;
+
       await pool.query(
         'INSERT INTO ngos (user_id, ngo_name, contact_person, registration_number, description, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-        [userId, ngo_name || name, contact_person || null, registration_number || null, description || null, 'pending']
+        [userId, ngo_name, contact_person, registration_number, description, 'pending']
       );
     } else if (role === 'scrapdealer') {
+      const business_name = req.body.business_name || name;
+      const contact_person = req.body.contact_person || req.body.contactPerson || name;
+      const registration_number = req.body.registration_number || req.body.registrationNumber || null;
+      const accepted_materials = req.body.accepted_materials || req.body.acceptedMaterials || [];
+
       await pool.query(
         'INSERT INTO scrap_dealers (user_id, business_name, contact_person, registration_number, accepted_materials, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-        [userId, business_name || name, contact_person || null, registration_number || null, accepted_materials ? JSON.stringify(accepted_materials) : '[]', 'pending']
+        [userId, business_name, contact_person, registration_number, Array.isArray(accepted_materials) ? JSON.stringify(accepted_materials) : (typeof accepted_materials === 'string' ? accepted_materials : '[]'), 'pending']
       );
     }
 

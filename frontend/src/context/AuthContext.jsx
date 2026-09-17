@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { getMe, login as apiLogin, logout as apiLogout } from '../services/auth';
+import { getMe, login as apiLogin, register as apiRegister, logout as apiLogout } from '../services/auth';
 import { toast } from 'react-hot-toast';
 
 export const AuthContext = createContext(null);
@@ -53,6 +53,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async (formData) => {
+    try {
+      const data = await apiRegister(formData);
+      if (data.token && data.user && data.user.status === 'active') {
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+        setUser(data.user);
+        setIsAuthenticated(true);
+        setLoading(false);
+      }
+      return data;
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Registration failed';
+      toast.error(msg);
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
       await apiLogout();
@@ -66,7 +84,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

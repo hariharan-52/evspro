@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Building2, Truck, Leaf, Clock, CheckCircle2, ArrowRight } from 'lucide-react';
-import { register } from '../../services/auth';
+import useAuth from '../../hooks/useAuth';
 import { toast } from 'react-hot-toast';
 import { RECYCLING_CATEGORIES } from '../../utils/constants';
 import LiveLocationButton from '../../components/common/LiveLocationButton';
@@ -10,6 +10,7 @@ const RegisterPage = () => {
   const [role, setRole] = useState('user');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRole, setSubmittedRole] = useState(null);
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   // Unified form state
@@ -85,11 +86,11 @@ const RegisterPage = () => {
       if (role === 'ngo' || role === 'scrapdealer') {
         setSubmittedRole(role);
       } else {
-        toast.success('Registration successful! Please sign in.');
-        navigate('/login');
+        toast.success('Registration successful! Welcome to EcoDonate.');
+        navigate('/dashboard');
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed');
+      console.error('Registration error:', err);
     } finally {
       setIsSubmitting(false);
     }
