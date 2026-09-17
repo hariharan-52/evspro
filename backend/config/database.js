@@ -211,6 +211,19 @@ async function initSQLite() {
       console.warn('Migration note:', migErr.message);
     }
 
+    try {
+      const recInfo = sqliteDb.exec("PRAGMA table_info(recycling_requests);");
+      const recCols = recInfo[0]?.values.map(c => c[1]) || [];
+      if (!recCols.includes('ai_prediction')) {
+        sqliteDb.run("ALTER TABLE recycling_requests ADD COLUMN ai_prediction TEXT;");
+      }
+      if (!recCols.includes('ai_confidence')) {
+        sqliteDb.run("ALTER TABLE recycling_requests ADD COLUMN ai_confidence REAL;");
+      }
+    } catch (recMigErr) {
+      console.warn('Recycling migration note:', recMigErr.message);
+    }
+
     const res = sqliteDb.exec("SELECT COUNT(*) as c FROM users");
     const count = res[0]?.values[0][0] || 0;
     if (count === 0) {

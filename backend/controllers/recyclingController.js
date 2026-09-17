@@ -13,7 +13,10 @@ const createRecycling = async (req, res, next) => {
     const city = req.body.city;
     const pincode = req.body.pincode;
     const pickup_date = req.body.pickup_date || req.body.pickupDate || null;
-    const ai_prediction = req.body.ai_prediction || null;
+    const ai_prediction = req.body.ai_prediction || req.body.aiPrediction || null;
+    const ai_confidence = req.body.ai_confidence !== undefined && req.body.ai_confidence !== null
+      ? parseFloat(req.body.ai_confidence)
+      : (req.body.aiConfidence !== undefined && req.body.aiConfidence !== null ? parseFloat(req.body.aiConfidence) : null);
     let image = req.body.image_url || req.body.image || null;
     if (req.file) {
       try {
