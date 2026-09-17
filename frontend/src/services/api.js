@@ -8,6 +8,7 @@ const api = axios.create({
   },
 });
 
+// Request interceptor — attach token from localStorage to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -19,15 +20,28 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Response interceptor — handle 401 gracefully
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const url = error.config?.url || '';
-    const isAuthRoute = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/me');
     
-    if (error.response && error.response.status === 401 && !isAuthRoute) {
+    // Never redirect to login for auth routes (login, register, me, logout)
+    const isAuthRoute = url.includes('/auth/');
+    
+    // Never redirect for notification-related routes (they fire in background)
+    const isBackgroundRoute = url.includes('/notifications');
+    
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      !isAuthRoute &&
+      !isBackgroundRoute
+    ) {
+      // Only redirect if user was previously authenticated (had a token)
+      const hadToken = !!localStorage.getItem('token');
       localStorage.removeItem('token');
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      if (hadToken && typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
         window.location.href = '/login';
       }
     }

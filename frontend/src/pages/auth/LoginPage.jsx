@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Leaf, Clock, AlertCircle } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
@@ -12,32 +12,50 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isPendingApproval, setIsPendingApproval] = useState(false);
   
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // If already authenticated, redirect to appropriate dashboard
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const role = user.role;
+      if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+      else if (role === 'ngo') navigate('/ngo/dashboard', { replace: true });
+      else if (role === 'scrapdealer') navigate('/dealer/dashboard', { replace: true });
+      else navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsPendingApproval(false);
+    
+    if (!email.trim() || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
-      const data = await login(email, password);
+      const data = await login(email.trim(), password);
       const role = data.user.role;
       
       const from = location.state?.from?.pathname;
       if (from) {
-        navigate(from);
+        navigate(from, { replace: true });
       } else {
-        if (role === 'admin') navigate('/admin/dashboard');
-        else if (role === 'ngo') navigate('/ngo/dashboard');
-        else if (role === 'scrapdealer') navigate('/dealer/dashboard');
-        else navigate('/dashboard');
+        if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+        else if (role === 'ngo') navigate('/ngo/dashboard', { replace: true });
+        else if (role === 'scrapdealer') navigate('/dealer/dashboard', { replace: true });
+        else navigate('/dashboard', { replace: true });
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid credentials';
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
       setError(msg);
-      if (msg.toLowerCase().includes('pending') || msg.toLowerCase().includes('admin approval') || msg.toLowerCase().includes('verified and approved')) {
+      if (status === 403 && (msg.toLowerCase().includes('pending') || msg.toLowerCase().includes('admin approval') || msg.toLowerCase().includes('verified and approved'))) {
         setIsPendingApproval(true);
       }
     } finally {
@@ -88,6 +106,7 @@ const LoginPage = () => {
               className="mt-1 block w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm shadow-xs focus:ring-green-500 focus:border-green-500 bg-white"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
             />
           </div>
 
@@ -101,6 +120,7 @@ const LoginPage = () => {
                 className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm shadow-xs focus:ring-green-500 focus:border-green-500 bg-white"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
               />
               <button
                 type="button"

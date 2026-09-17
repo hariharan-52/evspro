@@ -25,6 +25,21 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request/Response logger
+app.use((req, res, next) => {
+  const start = Date.now();
+  const originalEnd = res.end;
+  res.end = function (...args) {
+    const duration = Date.now() - start;
+    const isApi = req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/auth');
+    if (isApi) {
+      console.log(`[HTTP] ${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms)`);
+    }
+    originalEnd.apply(res, args);
+  };
+  next();
+});
+
 // Uploads directory config (compatible with Vercel serverless /tmp and local dev)
 const uploadsDir = process.env.VERCEL
   ? path.join(os.tmpdir(), 'uploads')
