@@ -44,18 +44,6 @@ npm run dev
 
 ---
 
-## 🚀 Deploy to Vercel (1-Click Monorepo)
-
-EcoDonate is pre-configured with `vercel.json` and a serverless API adapter (`/api/index.js`) for seamless deployment on Vercel:
-
-1. Push your repository to **GitHub / GitLab / Bitbucket**.
-2. Go to **[vercel.com](https://vercel.com)** ➜ **Add New Project** ➜ **Import your repository**.
-3. Leave root settings default (Build command: `npm run build`, Output: `frontend/dist`).
-4. Click **Deploy**!
-5. For complete details and database options, see [DEPLOYMENT.md](DEPLOYMENT.md).
-
----
-
 ## 🔑 Demo Credentials
 
 | Role | Email | Password |
@@ -94,3 +82,18 @@ The AI waste classifier is a **mock service** for demonstration. To connect a re
 ---
 
 © 2026 EcoDonate. *Small actions. Big impact.*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

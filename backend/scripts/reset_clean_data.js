@@ -154,25 +154,29 @@ async function resetCleanData() {
   // Insert ONLY Official Demo Credentials
   const defaultHash = bcrypt.hashSync('Password@123', 10);
   const adminHash = bcrypt.hashSync('Admin@123', 10);
+  const hariHash = bcrypt.hashSync('hari123', 10);
 
   db.run(`
     INSERT INTO users (id, name, email, phone, password_hash, role, address, city, state, pincode, status) VALUES
     (1, 'Admin User', 'admin@ecodonate.com', '9876543210', '${adminHash}', 'admin', 'Admin HQ', 'Delhi', 'Delhi', '110001', 'active'),
     (2, 'Rahul Sharma', 'rahul@example.com', '9876543211', '${defaultHash}', 'user', '12 MG Road', 'Mumbai', 'Maharashtra', '400001', 'active'),
-    (3, 'Priya Singh', 'priya@example.com', '9876543212', '${defaultHash}', 'user', '34 Brigade Road', 'Bangalore', 'Karnataka', '560001', 'active'),
-    (4, 'Amit Kumar', 'amit@example.com', '9876543213', '${defaultHash}', 'user', '56 Anna Salai', 'Chennai', 'Tamil Nadu', '600002', 'active'),
-    (5, 'Green Earth NGO', 'contact@greenearth.org', '9876543214', '${defaultHash}', 'ngo', '78 NGO Colony', 'Mumbai', 'Maharashtra', '400050', 'active'),
-    (6, 'Hope Foundation', 'hello@hopefoundation.org', '9876543215', '${defaultHash}', 'ngo', '90 Charity Street', 'Delhi', 'Delhi', '110020', 'pending'),
-    (7, 'Eco Scrap Traders', 'info@ecoscrap.com', '9876543216', '${defaultHash}', 'scrapdealer', '12 Industrial Area', 'Mumbai', 'Maharashtra', '400093', 'active'),
-    (8, 'City Recyclers', 'contact@cityrecyclers.com', '9876543217', '${defaultHash}', 'scrapdealer', '34 Scrap Yard', 'Bangalore', 'Karnataka', '560022', 'pending');
+    (3, 'Hari User', 'harihari@gmail.com', '9876543220', '${hariHash}', 'user', '24 Green Avenue', 'Chennai', 'Tamil Nadu', '600001', 'active'),
+    (4, 'Green Earth NGO', 'contact@greenearth.org', '9876543214', '${defaultHash}', 'ngo', '78 NGO Colony', 'Mumbai', 'Maharashtra', '400050', 'active'),
+    (5, 'Hari NGO', 'hariharingo@gmail.com', '9876543221', '${hariHash}', 'ngo', '45 Care Foundation Road', 'Chennai', 'Tamil Nadu', '600004', 'active'),
+    (6, 'Eco Scrap Traders', 'info@ecoscrap.com', '9876543216', '${defaultHash}', 'scrapdealer', '12 Industrial Area', 'Mumbai', 'Maharashtra', '400093', 'active'),
+    (7, 'Hari Scrap Dealers', 'harihariscrap@gmail.com', '9876543222', '${hariHash}', 'scrapdealer', '88 Recycle Park', 'Chennai', 'Tamil Nadu', '600032', 'active'),
+    (8, 'Hope Foundation (Unapproved NGO)', 'pendingngo@example.com', '9876543215', '${defaultHash}', 'ngo', '90 Charity Street', 'Delhi', 'Delhi', '110020', 'pending'),
+    (9, 'City Recyclers (Unapproved Scrap Dealer)', 'pendingscrap@example.com', '9876543217', '${defaultHash}', 'scrapdealer', '34 Scrap Yard', 'Bangalore', 'Karnataka', '560022', 'pending');
 
     INSERT INTO ngos (id, user_id, ngo_name, contact_person, registration_number, description, verification_status) VALUES
-    (1, 5, 'Green Earth NGO', 'Suresh Patel', 'REG123456', 'Dedicated to environmental conservation and helping the needy.', 'approved'),
-    (2, 6, 'Hope Foundation', 'Meera Reddy', 'REG654321', 'Providing education and resources to underprivileged children.', 'pending');
+    (1, 4, 'Green Earth NGO', 'Suresh Patel', 'REG123456', 'Dedicated to environmental conservation and helping the needy.', 'approved'),
+    (2, 5, 'Hari NGO Foundation', 'Hariharan', 'REG789101', 'Empowering communities through sustainable donations and aid.', 'approved'),
+    (3, 8, 'Hope Foundation', 'Meera Reddy', 'REG654321', 'Providing education and resources to underprivileged children.', 'pending');
 
     INSERT INTO scrap_dealers (id, user_id, business_name, contact_person, registration_number, accepted_materials, verification_status) VALUES
-    (1, 7, 'Eco Scrap Traders', 'Ramesh Gupta', 'SCRAP987', '["Plastic","Paper","Metal","E-Waste"]', 'approved'),
-    (2, 8, 'City Recyclers', 'Vinod Desai', 'SCRAP123', '["Paper","Cardboard","Glass"]', 'pending');
+    (1, 6, 'Eco Scrap Traders', 'Ramesh Gupta', 'SCRAP987', '["Plastic","Paper","Metal","E-Waste"]', 'approved'),
+    (2, 7, 'Hari Scrap Dealers', 'Hariharan Scrap', 'SCRAP555', '["Plastic","Paper","Metal","E-Waste","Glass"]', 'approved'),
+    (3, 9, 'City Recyclers', 'Vinod Desai', 'SCRAP123', '["Paper","Cardboard","Glass"]', 'pending');
   `);
 
   // Write pristine SQLite file
@@ -183,15 +187,16 @@ async function resetCleanData() {
   console.log('   • 0 Donations');
   console.log('   • 0 Recycling Requests');
   console.log('   • 0 Status Logs / Impact Records / Notifications');
-  console.log('   • 8 Official Demo Accounts Preserved:\n');
+  console.log('   • 9 Official Accounts Preserved:\n');
   console.log('     1. Admin: admin@ecodonate.com (Admin@123)');
   console.log('     2. User (Donor): rahul@example.com (Password@123)');
-  console.log('     3. User (Donor): priya@example.com (Password@123)');
-  console.log('     4. User (Donor): amit@example.com (Password@123)');
-  console.log('     5. NGO (Approved): contact@greenearth.org (Password@123)');
-  console.log('     6. NGO (Pending): hello@hopefoundation.org (Password@123)');
-  console.log('     7. Scrap Dealer (Approved): info@ecoscrap.com (Password@123)');
-  console.log('     8. Scrap Dealer (Pending): contact@cityrecyclers.com (Password@123)');
+  console.log('     3. User (Donor): harihari@gmail.com (hari123)');
+  console.log('     4. NGO (Approved): contact@greenearth.org (Password@123)');
+  console.log('     5. NGO (Approved): hariharingo@gmail.com (hari123)');
+  console.log('     6. Scrap Dealer (Approved): info@ecoscrap.com (Password@123)');
+  console.log('     7. Scrap Dealer (Approved): harihariscrap@gmail.com (hari123)');
+  console.log('     8. NGO (Unapproved/Pending): pendingngo@example.com (Password@123)');
+  console.log('     9. Scrap Dealer (Unapproved/Pending): pendingscrap@example.com (Password@123)');
   console.log('\n=====================================================');
 }
 

@@ -27,10 +27,10 @@ api.interceptors.response.use(
     const url = error.config?.url || '';
     
     // Never redirect to login for auth routes (login, register, me, logout)
-    const isAuthRoute = url.includes('/auth/');
+    const isAuthRoute = url.includes('auth');
     
     // Never redirect for notification-related routes (they fire in background)
-    const isBackgroundRoute = url.includes('/notifications');
+    const isBackgroundRoute = url.includes('notifications');
     
     if (
       error.response &&
