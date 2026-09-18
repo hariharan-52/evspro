@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// Client-side image compressor: keeps image quality crisp while keeping payload lightweight for serverless/DB storage
-const compressImage = (file, maxWidth = 1200, quality = 0.85) => {
+// Client-side image compressor: keeps image quality crisp while keeping payload lightweight (<200KB)
+const compressImage = (file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -17,9 +17,10 @@ const compressImage = (file, maxWidth = 1200, quality = 0.85) => {
         let width = img.width;
         let height = img.height;
 
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
         }
 
         const canvas = document.createElement('canvas');
@@ -28,10 +29,20 @@ const compressImage = (file, maxWidth = 1200, quality = 0.85) => {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        // If still > 350KB, compress with slightly lower quality
+        if (dataUrl.length > 350 * 1024) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.60);
+        }
         resolve(dataUrl);
       };
-      img.onerror = (err) => resolve(event.target.result); // Fallback to raw dataUrl if canvas fails
+      img.onerror = () => {
+        if (file.size > 2 * 1024 * 1024) {
+          reject(new Error('Image is too large to process. Please select a smaller photo.'));
+        } else {
+          resolve(event.target.result);
+        }
+      };
     };
     reader.onerror = (err) => reject(err);
   });
@@ -122,13 +133,17 @@ const ImageUpload = ({
       setSourceType('file');
       if (onImageSelect) onImageSelect(file, compressedDataUrl);
     } catch (err) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-        setSourceType('file');
-        if (onImageSelect) onImageSelect(file, reader.result);
-      };
-      reader.readAsDataURL(file);
+      if (file.size <= 1.5 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreview(reader.result);
+          setSourceType('file');
+          if (onImageSelect) onImageSelect(file, reader.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        toast.error(err.message || 'Image is too large. Please select a smaller photo.');
+      }
     } finally {
       setProcessing(false);
     }
@@ -199,14 +214,14 @@ const ImageUpload = ({
     canvas.toBlob((blob) => {
       if (blob) {
         const file = new File([blob], `camera-snap-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
         setPreview(dataUrl);
         setSourceType('camera');
         stopCamera();
         if (onImageSelect) onImageSelect(file, dataUrl);
         toast.success('Live photo captured successfully!');
       }
-    }, 'image/jpeg', 0.85);
+    }, 'image/jpeg', 0.75);
   };
 
   // URL Input

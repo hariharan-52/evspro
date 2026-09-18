@@ -71,8 +71,7 @@ const RecyclePage = () => {
         pickup_date: formData.pickupDate || null,
         ai_prediction: aiResult ? aiResult.detected : null,
         ai_confidence: aiResult ? aiResult.confidence : null,
-        image: typeof formData.image === 'string' ? formData.image : undefined,
-        image_url: typeof formData.image === 'string' ? formData.image : undefined
+        image: typeof formData.image === 'string' ? formData.image : undefined
       };
 
       if (formData.image instanceof File) {

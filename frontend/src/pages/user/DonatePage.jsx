@@ -48,8 +48,7 @@ const DonatePage = () => {
         pincode: formData.pincode,
         pickup_date: formData.pickupDate || null,
         additional_notes: formData.notes || null,
-        image: typeof formData.image === 'string' ? formData.image : undefined,
-        image_url: typeof formData.image === 'string' ? formData.image : undefined
+        image: typeof formData.image === 'string' ? formData.image : undefined
       };
 
       if (formData.image instanceof File) {
