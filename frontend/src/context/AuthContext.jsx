@@ -107,8 +107,22 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const userData = await getMe();
+      setUser(userData);
+      return userData;
+    } catch (e) {
+      console.warn('Failed to refresh user:', e?.message);
+    }
+  }, []);
+
+  const updateUser = useCallback((updatedFields) => {
+    setUser(prev => (prev ? { ...prev, ...updatedFields } : prev));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, register, logout, refreshUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

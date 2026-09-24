@@ -130,17 +130,36 @@ const updateDonationStatus = async (req, res, next) => {
     const { status, notes } = req.body;
     const { id } = req.params;
     
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
+    }
+
+    const normalizedStatus = status.trim().toUpperCase();
     const [donation] = await pool.query('SELECT * FROM donations WHERE id = ?', [id]);
-    if (donation.length === 0) return res.status(404).json({ message: 'Not found' });
+    if (donation.length === 0) return res.status(404).json({ message: 'Donation request not found' });
     
-    let updateQuery = 'UPDATE donations SET status = ?';
-    const updateParams = [status];
+    let updateQuery = 'UPDATE donations SET status = ?, updated_at = CURRENT_TIMESTAMP';
+    const updateParams = [normalizedStatus];
     
     if (req.user.role === 'ngo') {
-      const [ngo] = await pool.query('SELECT id FROM ngos WHERE user_id = ?', [req.user.id]);
-      if (ngo.length > 0 && !donation[0].ngo_id) {
+      const [ngo] = await pool.query('SELECT id, verification_status FROM ngos WHERE user_id = ?', [req.user.id]);
+      if (ngo.length === 0) {
+        return res.status(403).json({ message: 'NGO record not found for this user' });
+      }
+      if (ngo[0].verification_status !== 'approved') {
+        return res.status(403).json({ message: 'Your NGO account must be verified and approved by an administrator before managing donation requests.' });
+      }
+      const ngoId = ngo[0].id;
+
+      // If already accepted by a different NGO, forbid takeover
+      if (donation[0].ngo_id && donation[0].ngo_id !== ngoId) {
+        return res.status(403).json({ message: 'This donation has already been accepted by another NGO.' });
+      }
+
+      // Assign to this NGO on acceptance (not if rejected)
+      if (!donation[0].ngo_id && normalizedStatus !== 'REJECTED') {
         updateQuery += ', ngo_id = ?';
-        updateParams.push(ngo[0].id);
+        updateParams.push(ngoId);
       }
     }
     
@@ -149,22 +168,22 @@ const updateDonationStatus = async (req, res, next) => {
     
     await pool.query(updateQuery, updateParams);
     
-    const defaultNote = status === 'RECEIVED' 
+    const defaultNote = normalizedStatus === 'RECEIVED' 
       ? (notes || 'Item received and verified by NGO.')
-      : status === 'COMPLETED'
+      : normalizedStatus === 'COMPLETED'
       ? (notes || 'Donation completed and distributed.')
-      : (notes || `Status updated to ${status}`);
+      : (notes || `Status updated to ${normalizedStatus}`);
 
     await pool.query(
       `INSERT INTO request_status_history (request_type, request_db_id, status, updated_by, notes) VALUES (?, ?, ?, ?, ?)`,
-      ['donation', id, status, req.user.id, defaultNote]
+      ['donation', id, normalizedStatus, req.user.id, defaultNote]
     );
 
     // Notify donor user
     await pool.query(`INSERT INTO notifications (user_id, title, message, type, related_id, related_type) VALUES (?, ?, ?, ?, ?, ?)`,
-      [donation[0].user_id, 'Donation Update', `Your donation ${donation[0].request_id} is now ${status}`, 'donation_status', id, 'donation']);
+      [donation[0].user_id, 'Donation Update', `Your donation ${donation[0].request_id} is now ${normalizedStatus}`, 'donation_status', id, 'donation']);
 
-    if (status === 'COMPLETED' || status === 'RECEIVED') {
+    if (normalizedStatus === 'COMPLETED' || normalizedStatus === 'RECEIVED') {
       const [existingImpact] = await pool.query('SELECT id FROM impact_records WHERE request_type = "donation" AND request_db_id = ?', [id]);
       if (existingImpact.length === 0) {
         await pool.query(
@@ -174,7 +193,7 @@ const updateDonationStatus = async (req, res, next) => {
       }
     }
 
-    res.json({ message: `Donation marked as ${status} successfully`, status });
+    res.json({ message: `Donation marked as ${normalizedStatus} successfully`, status: normalizedStatus });
   } catch (error) {
     next(error);
   }

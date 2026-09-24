@@ -7,22 +7,57 @@ import { RECYCLING_CATEGORIES } from '../../utils/constants';
 import LiveLocationButton from '../../components/common/LiveLocationButton';
 
 const DealerProfilePage = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
+  
+  const parseMaterials = (raw) => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        return raw.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+    return ['Plastic', 'Paper', 'Metal'];
+  };
+
   const [profileData, setProfileData] = useState({
-    businessName: 'Eco Plastics Recycling',
-    contactPerson: 'Mike Ross',
-    acceptedMaterials: ['Plastic', 'Glass', 'Paper'],
-    address: user?.address || '101 Pine St',
-    city: user?.city || 'Denver',
-    state: user?.state || 'CO',
-    pincode: user?.pincode || '80202',
-    regNumber: 'DL-8822',
-    verificationStatus: 'approved'
+    businessName: user?.scrap_dealer_details?.business_name || user?.name || '',
+    contactPerson: user?.scrap_dealer_details?.contact_person || user?.name || '',
+    acceptedMaterials: parseMaterials(user?.scrap_dealer_details?.accepted_materials),
+    address: user?.address || '',
+    city: user?.city || '',
+    state: user?.state || '',
+    pincode: user?.pincode || '',
+    regNumber: user?.scrap_dealer_details?.registration_number || 'N/A',
+    verificationStatus: user?.scrap_dealer_details?.verification_status || user?.status || 'pending'
   });
 
   useEffect(() => {
-    // In real app, fetch from /auth/me
+    const loadFreshProfile = async () => {
+      try {
+        const res = await api.get('/auth/me');
+        const u = res.data;
+        if (u) {
+          setProfileData({
+            businessName: u.scrap_dealer_details?.business_name || u.name || '',
+            contactPerson: u.scrap_dealer_details?.contact_person || u.name || '',
+            acceptedMaterials: parseMaterials(u.scrap_dealer_details?.accepted_materials),
+            address: u.address || '',
+            city: u.city || '',
+            state: u.state || '',
+            pincode: u.pincode || '',
+            regNumber: u.scrap_dealer_details?.registration_number || 'N/A',
+            verificationStatus: u.scrap_dealer_details?.verification_status || u.status || 'pending'
+          });
+        }
+      } catch (err) {
+        console.warn('Could not refresh Scrap Dealer profile:', err.message);
+      }
+    };
+    loadFreshProfile();
   }, []);
 
   const handleChange = (e) => {
@@ -42,10 +77,22 @@ const DealerProfilePage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.put('/scrap-dealers/profile', profileData);
-      toast.success('Business Profile updated successfully');
+      await api.put('/scrap-dealers/profile', {
+        business_name: profileData.businessName,
+        businessName: profileData.businessName,
+        contact_person: profileData.contactPerson,
+        contactPerson: profileData.contactPerson,
+        accepted_materials: profileData.acceptedMaterials,
+        acceptedMaterials: profileData.acceptedMaterials,
+        address: profileData.address,
+        city: profileData.city,
+        state: profileData.state,
+        pincode: profileData.pincode
+      });
+      await refreshUser();
+      toast.success('Business Profile updated successfully!');
     } catch (err) {
-      toast.success('Business Profile updated (Mock mode)');
+      toast.error(err.response?.data?.message || 'Failed to update business profile');
     } finally {
       setLoading(false);
     }

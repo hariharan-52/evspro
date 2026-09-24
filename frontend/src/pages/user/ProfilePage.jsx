@@ -5,8 +5,10 @@ import { toast } from 'react-hot-toast';
 import { Save, User, MapPin, Mail, Phone } from 'lucide-react';
 import LiveLocationButton from '../../components/common/LiveLocationButton';
 
+import api from '../../services/api';
+
 const ProfilePage = () => {
-  const { user } = useAuth();
+  const { user, updateUser, refreshUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -19,18 +21,40 @@ const ProfilePage = () => {
     pincode: user?.pincode || '',
   });
 
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        city: user.city || '',
+        state: user.state || '',
+        pincode: user.pincode || '',
+      });
+    }
+  }, [user]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const res = await api.put('/users', formData);
+      if (res.data?.user) {
+        updateUser(res.data.user);
+      } else {
+        await refreshUser();
+      }
       setIsEditing(false);
-      toast.success('Profile updated successfully (Mock)');
-    }, 1000);
+      toast.success('Profile updated successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

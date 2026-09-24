@@ -54,10 +54,41 @@ const verifyScrapDealer = async (req, res, next) => {
 
 const updateScrapDealerProfile = async (req, res, next) => {
   try {
-    const { business_name, contact_person, accepted_materials } = req.body;
-    await pool.query('UPDATE scrap_dealers SET business_name = ?, contact_person = ?, accepted_materials = ? WHERE user_id = ?', 
-      [business_name, contact_person, JSON.stringify(accepted_materials || []), req.user.id]);
-    res.json({ message: 'Profile updated' });
+    const [existingSD] = await pool.query('SELECT * FROM scrap_dealers WHERE user_id = ?', [req.user.id]);
+    if (existingSD.length === 0) return res.status(404).json({ message: 'Scrap Dealer not found' });
+    const curr = existingSD[0];
+
+    const business_name = req.body.business_name || req.body.businessName || curr.business_name;
+    const contact_person = req.body.contact_person || req.body.contactPerson || curr.contact_person;
+    let accepted_materials = req.body.accepted_materials || req.body.acceptedMaterials;
+    if (accepted_materials === undefined) {
+      accepted_materials = curr.accepted_materials;
+    }
+    const matsJson = Array.isArray(accepted_materials) ? JSON.stringify(accepted_materials) : (typeof accepted_materials === 'string' ? accepted_materials : '[]');
+
+    await pool.query(
+      'UPDATE scrap_dealers SET business_name = ?, contact_person = ?, accepted_materials = ? WHERE user_id = ?', 
+      [business_name, contact_person, matsJson, req.user.id]
+    );
+
+    // Also update scrap dealer address, city, state, pincode, phone in users table
+    const [existingUser] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+    if (existingUser.length > 0) {
+      const u = existingUser[0];
+      const name = business_name || u.name;
+      const phone = req.body.phone !== undefined ? req.body.phone : u.phone;
+      const address = req.body.address !== undefined ? req.body.address : u.address;
+      const city = req.body.city !== undefined ? req.body.city : u.city;
+      const state = req.body.state !== undefined ? req.body.state : u.state;
+      const pincode = req.body.pincode !== undefined ? req.body.pincode : u.pincode;
+
+      await pool.query(
+        'UPDATE users SET name = ?, phone = ?, address = ?, city = ?, state = ?, pincode = ? WHERE id = ?',
+        [name, phone, address, city, state, pincode, req.user.id]
+      );
+    }
+
+    res.json({ message: 'Scrap dealer profile updated successfully' });
   } catch (error) {
     next(error);
   }
@@ -65,13 +96,13 @@ const updateScrapDealerProfile = async (req, res, next) => {
 
 const getScrapDealerDashboard = async (req, res, next) => {
   try {
-    const [sd] = await pool.query('SELECT id FROM scrap_dealers WHERE user_id = ?', [req.user.id]);
+    const [sd] = await pool.query('SELECT id, verification_status, rejection_reason FROM scrap_dealers WHERE user_id = ?', [req.user.id]);
     if (sd.length === 0) return res.status(404).json({ message: 'Not found' });
     
     const [stats] = await pool.query(
       `SELECT status, COUNT(*) as count FROM recycling_requests WHERE scrap_dealer_id = ? GROUP BY status`, [sd[0].id]
     );
-    res.json(stats);
+    res.json({ stats, verification_status: sd[0].verification_status, rejection_reason: sd[0].rejection_reason });
   } catch (error) {
     next(error);
   }

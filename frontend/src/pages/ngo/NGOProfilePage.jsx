@@ -6,22 +6,43 @@ import { Building2, Save, MapPin, CheckCircle, Clock, AlertTriangle } from 'luci
 import LiveLocationButton from '../../components/common/LiveLocationButton';
 
 const NGOProfilePage = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState({
-    ngoName: 'Green Earth',
-    contactPerson: 'Jane Smith',
-    description: 'We are dedicated to sustainable living.',
-    address: user?.address || '123 Main St',
-    city: user?.city || 'Boston',
-    state: user?.state || 'MA',
-    pincode: user?.pincode || '02101',
-    regNumber: 'REG-9912',
-    verificationStatus: 'approved'
+    ngoName: user?.ngo_details?.ngo_name || user?.name || '',
+    contactPerson: user?.ngo_details?.contact_person || user?.name || '',
+    description: user?.ngo_details?.description || '',
+    address: user?.address || '',
+    city: user?.city || '',
+    state: user?.state || '',
+    pincode: user?.pincode || '',
+    regNumber: user?.ngo_details?.registration_number || 'N/A',
+    verificationStatus: user?.ngo_details?.verification_status || user?.status || 'pending'
   });
 
   useEffect(() => {
-    // In real app, fetch from /auth/me for fresh data
+    const loadFreshProfile = async () => {
+      try {
+        const res = await api.get('/auth/me');
+        const u = res.data;
+        if (u) {
+          setProfileData({
+            ngoName: u.ngo_details?.ngo_name || u.name || '',
+            contactPerson: u.ngo_details?.contact_person || u.name || '',
+            description: u.ngo_details?.description || '',
+            address: u.address || '',
+            city: u.city || '',
+            state: u.state || '',
+            pincode: u.pincode || '',
+            regNumber: u.ngo_details?.registration_number || 'N/A',
+            verificationStatus: u.ngo_details?.verification_status || u.status || 'pending'
+          });
+        }
+      } catch (err) {
+        console.warn('Could not refresh NGO profile:', err.message);
+      }
+    };
+    loadFreshProfile();
   }, []);
 
   const handleChange = (e) => {
@@ -32,10 +53,21 @@ const NGOProfilePage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.put('/ngos/profile', profileData);
-      toast.success('NGO Profile updated successfully');
+      await api.put('/ngos/profile', {
+        ngo_name: profileData.ngoName,
+        ngoName: profileData.ngoName,
+        contact_person: profileData.contactPerson,
+        contactPerson: profileData.contactPerson,
+        description: profileData.description,
+        address: profileData.address,
+        city: profileData.city,
+        state: profileData.state,
+        pincode: profileData.pincode
+      });
+      await refreshUser();
+      toast.success('NGO Profile updated successfully!');
     } catch (err) {
-      toast.success('NGO Profile updated (Mock mode)');
+      toast.error(err.response?.data?.message || 'Failed to update NGO profile');
     } finally {
       setLoading(false);
     }

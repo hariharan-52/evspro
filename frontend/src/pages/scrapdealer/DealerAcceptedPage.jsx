@@ -23,8 +23,8 @@ const DealerAcceptedPage = () => {
     try {
       const res = await api.get('/recycling');
       const data = Array.isArray(res.data) ? res.data : [];
-      // Active pickups: ACCEPTED or PICKUP_SCHEDULED
-      const accepted = data.filter(r => r.status === 'ACCEPTED' || r.status === 'PICKUP_SCHEDULED');
+      // Active pickups & collected materials awaiting processing completion
+      const accepted = data.filter(r => r.status === 'ACCEPTED' || r.status === 'PICKUP_SCHEDULED' || r.status === 'COLLECTED');
       setRequests(accepted);
     } catch (err) {
       toast.error('Failed to load active recycling jobs');
@@ -42,10 +42,11 @@ const DealerAcceptedPage = () => {
         notes: newStatus === 'COLLECTED' ? 'Materials collected from donor and weighed at facility.' : 'Processing Completed'
       });
       if (newStatus === 'COLLECTED') {
-        toast.success('Job marked as Collected! Added to your Collection History.', { duration: 4000 });
+        toast.success('Job marked as Collected! Ready for final processing completion.', { duration: 4000 });
       } else {
         toast.success(`Job marked as ${newStatus}`);
       }
+      setSelectedReq(null);
       fetchRequests();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Action failed');
@@ -193,8 +194,26 @@ const DealerAcceptedPage = () => {
                 <div><span className="block text-gray-500 text-xs">Status</span><StatusBadge status={selectedReq.status} /></div>
               </div>
             </div>
-            <div className="p-4 border-t bg-gray-50 flex justify-end">
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
               <button onClick={() => setSelectedReq(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Close</button>
+              {(selectedReq.status === 'ACCEPTED' || selectedReq.status === 'PICKUP_SCHEDULED') && (
+                <button
+                  onClick={() => handleStatusUpdate(selectedReq.id, 'COLLECTED')}
+                  disabled={updatingId === selectedReq.id}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Truck size={16} /> Mark as Collected
+                </button>
+              )}
+              {selectedReq.status === 'COLLECTED' && (
+                <button
+                  onClick={() => handleStatusUpdate(selectedReq.id, 'COMPLETED')}
+                  disabled={updatingId === selectedReq.id}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <CheckCircle size={16} /> Complete Processing
+                </button>
+              )}
             </div>
           </div>
         </div>

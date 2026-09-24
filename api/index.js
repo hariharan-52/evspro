@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
 module.exports.config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb'
+      sizeLimit: '50mb'
     }
   }
 };

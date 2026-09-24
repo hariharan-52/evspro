@@ -134,17 +134,36 @@ const updateRecyclingStatus = async (req, res, next) => {
     const { status, notes } = req.body;
     const { id } = req.params;
     
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
+    }
+
+    const normalizedStatus = status.trim().toUpperCase();
     const [request] = await pool.query('SELECT * FROM recycling_requests WHERE id = ?', [id]);
-    if (request.length === 0) return res.status(404).json({ message: 'Not found' });
+    if (request.length === 0) return res.status(404).json({ message: 'Recycling request not found' });
     
-    let updateQuery = 'UPDATE recycling_requests SET status = ?';
-    const updateParams = [status];
+    let updateQuery = 'UPDATE recycling_requests SET status = ?, updated_at = CURRENT_TIMESTAMP';
+    const updateParams = [normalizedStatus];
     
     if (req.user.role === 'scrapdealer') {
-      const [sd] = await pool.query('SELECT id FROM scrap_dealers WHERE user_id = ?', [req.user.id]);
-      if (sd.length > 0 && !request[0].scrap_dealer_id) {
+      const [sd] = await pool.query('SELECT id, verification_status FROM scrap_dealers WHERE user_id = ?', [req.user.id]);
+      if (sd.length === 0) {
+        return res.status(403).json({ message: 'Scrap dealer record not found for this user' });
+      }
+      if (sd[0].verification_status !== 'approved') {
+        return res.status(403).json({ message: 'Your Scrap Dealer account must be verified and approved by an administrator before managing recycling requests.' });
+      }
+      const dealerId = sd[0].id;
+
+      // If already accepted by a different dealer, forbid takeover
+      if (request[0].scrap_dealer_id && request[0].scrap_dealer_id !== dealerId) {
+        return res.status(403).json({ message: 'This recycling job has already been claimed by another scrap dealer.' });
+      }
+
+      // Assign to this dealer on acceptance (not if rejected)
+      if (!request[0].scrap_dealer_id && normalizedStatus !== 'REJECTED') {
         updateQuery += ', scrap_dealer_id = ?';
-        updateParams.push(sd[0].id);
+        updateParams.push(dealerId);
       }
     }
     
@@ -153,21 +172,21 @@ const updateRecyclingStatus = async (req, res, next) => {
     
     await pool.query(updateQuery, updateParams);
     
-    const defaultNote = status === 'COLLECTED' 
+    const defaultNote = normalizedStatus === 'COLLECTED' 
       ? (notes || 'Recyclable scrap materials collected and weighed at facility.')
-      : status === 'COMPLETED'
+      : normalizedStatus === 'COMPLETED'
       ? (notes || 'Materials processed, sorted, and sent for eco-friendly recycling.')
-      : (notes || `Status updated to ${status}`);
+      : (notes || `Status updated to ${normalizedStatus}`);
 
     await pool.query(
       `INSERT INTO request_status_history (request_type, request_db_id, status, updated_by, notes) VALUES (?, ?, ?, ?, ?)`,
-      ['recycling', id, status, req.user.id, defaultNote]
+      ['recycling', id, normalizedStatus, req.user.id, defaultNote]
     );
 
     await pool.query(`INSERT INTO notifications (user_id, title, message, type, related_id, related_type) VALUES (?, ?, ?, ?, ?, ?)`,
-      [request[0].user_id, 'Recycling Update', `Your request ${request[0].request_id} is now ${status}`, 'recycling_status', id, 'recycling']);
+      [request[0].user_id, 'Recycling Update', `Your request ${request[0].request_id} is now ${normalizedStatus}`, 'recycling_status', id, 'recycling']);
 
-    if (status === 'COMPLETED' || status === 'COLLECTED') {
+    if (normalizedStatus === 'COMPLETED' || normalizedStatus === 'COLLECTED') {
       const [existingImpact] = await pool.query('SELECT id FROM impact_records WHERE request_type = "recycling" AND request_db_id = ?', [id]);
       const q = parseFloat(request[0].quantity) || 1;
       if (existingImpact.length === 0) {
@@ -177,7 +196,7 @@ const updateRecyclingStatus = async (req, res, next) => {
         );
       }
     }
-    res.json({ message: `Recycling job marked as ${status} successfully`, status });
+    res.json({ message: `Recycling job marked as ${normalizedStatus} successfully`, status: normalizedStatus });
   } catch (error) {
     next(error);
   }

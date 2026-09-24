@@ -27,20 +27,14 @@ const AdminUsersPage = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Mock API call structure
       const query = `?search=${search}&role=${roleFilter}&status=${statusFilter}&page=${currentPage}`;
       const res = await api.get(`/users${query}`);
       setUsers(res.data.users || []);
-      setTotalPages(res.data.totalPages || 1);
+      setTotalPages(res.data.totalPages || Math.ceil((res.data.total || 0) / (res.data.limit || 20)) || 1);
     } catch (err) {
-      console.error(err);
-      // Fallback for UI demo
-      setUsers([
-        { id: '1', name: 'John Doe', email: 'john@example.com', phone: '1234567890', role: 'user', city: 'New York', status: 'active', createdAt: '2026-01-15' },
-        { id: '2', name: 'Green Earth NGO', email: 'contact@greenearth.org', phone: '0987654321', role: 'ngo', city: 'Boston', status: 'active', createdAt: '2026-02-20' },
-        { id: '3', name: 'City Scrap Recyclers', email: 'admin@cityscrap.com', phone: '1122334455', role: 'scrapdealer', city: 'Chicago', status: 'pending', createdAt: '2026-03-10' },
-        { id: '4', name: 'Admin Jane', email: 'jane@ecodonate.com', phone: '5556667777', role: 'admin', city: 'Seattle', status: 'inactive', createdAt: '2025-11-05' }
-      ]);
+      console.error('Failed to fetch users:', err);
+      toast.error('Failed to load users from server');
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -68,10 +62,11 @@ const AdminUsersPage = () => {
         await api.patch(`/users/${selectedUser.id}/status`, { status: newStatus });
         toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
       }
+      setShowConfirmModal(false);
+      setSelectedUser(null);
       fetchUsers();
     } catch (err) {
-      toast.success(`Action successful (Mock mode)`);
-      fetchUsers(); // Refresh anyway in mock mode
+      toast.error(err.response?.data?.message || 'Action failed');
     }
   };
 

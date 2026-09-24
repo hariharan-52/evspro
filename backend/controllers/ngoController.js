@@ -54,10 +54,37 @@ const verifyNGO = async (req, res, next) => {
 
 const updateNGOProfile = async (req, res, next) => {
   try {
-    const { ngo_name, contact_person, description } = req.body;
-    await pool.query('UPDATE ngos SET ngo_name = ?, contact_person = ?, description = ? WHERE user_id = ?', 
-      [ngo_name, contact_person, description, req.user.id]);
-    res.json({ message: 'Profile updated' });
+    const [existingNGO] = await pool.query('SELECT * FROM ngos WHERE user_id = ?', [req.user.id]);
+    if (existingNGO.length === 0) return res.status(404).json({ message: 'NGO record not found' });
+    const curr = existingNGO[0];
+
+    const ngo_name = req.body.ngo_name || req.body.ngoName || curr.ngo_name;
+    const contact_person = req.body.contact_person || req.body.contactPerson || curr.contact_person;
+    const description = req.body.description !== undefined ? req.body.description : curr.description;
+
+    await pool.query(
+      'UPDATE ngos SET ngo_name = ?, contact_person = ?, description = ? WHERE user_id = ?', 
+      [ngo_name, contact_person, description, req.user.id]
+    );
+
+    // Also update organization address, city, state, pincode, phone in users table
+    const [existingUser] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+    if (existingUser.length > 0) {
+      const u = existingUser[0];
+      const name = ngo_name || u.name;
+      const phone = req.body.phone !== undefined ? req.body.phone : u.phone;
+      const address = req.body.address !== undefined ? req.body.address : u.address;
+      const city = req.body.city !== undefined ? req.body.city : u.city;
+      const state = req.body.state !== undefined ? req.body.state : u.state;
+      const pincode = req.body.pincode !== undefined ? req.body.pincode : u.pincode;
+
+      await pool.query(
+        'UPDATE users SET name = ?, phone = ?, address = ?, city = ?, state = ?, pincode = ? WHERE id = ?',
+        [name, phone, address, city, state, pincode, req.user.id]
+      );
+    }
+
+    res.json({ message: 'NGO profile updated successfully' });
   } catch (error) {
     next(error);
   }
@@ -65,14 +92,14 @@ const updateNGOProfile = async (req, res, next) => {
 
 const getNGODashboard = async (req, res, next) => {
   try {
-    const [ngo] = await pool.query('SELECT id FROM ngos WHERE user_id = ?', [req.user.id]);
+    const [ngo] = await pool.query('SELECT id, verification_status, rejection_reason FROM ngos WHERE user_id = ?', [req.user.id]);
     if (ngo.length === 0) return res.status(404).json({ message: 'Not found' });
     
     const ngoId = ngo[0].id;
     const [stats] = await pool.query(
       `SELECT status, COUNT(*) as count FROM donations WHERE ngo_id = ? GROUP BY status`, [ngoId]
     );
-    res.json(stats);
+    res.json({ stats, verification_status: ngo[0].verification_status, rejection_reason: ngo[0].rejection_reason });
   } catch (error) {
     next(error);
   }

@@ -34,7 +34,12 @@ const getUsers = async (req, res, next) => {
     if (status && status !== 'all' && status !== 'ALL') { countQuery += ' AND status = ?'; }
     const [[{ total }]] = await pool.query(countQuery, countParams);
 
-    res.json({ users, total: total || 0, page: parseInt(page, 10), limit: parseInt(limit, 10) });
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 20;
+    const totalCount = total || 0;
+    const totalPages = Math.max(1, Math.ceil(totalCount / limitNum));
+
+    res.json({ users, total: totalCount, totalPages, page: pageNum, limit: limitNum });
   } catch (error) {
     next(error);
   }
@@ -52,12 +57,29 @@ const getUserById = async (req, res, next) => {
 
 const updateUser = async (req, res, next) => {
   try {
-    const { name, phone, address, city, state, pincode } = req.body;
-    const id = req.user.role === 'admin' && req.params.id ? req.params.id : req.user.id;
+    const id = req.user.role === 'admin' && req.params.id && req.params.id !== 'profile' ? req.params.id : req.user.id;
+    const [existing] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+    if (existing.length === 0) return res.status(404).json({ message: 'User not found' });
     
-    await pool.query('UPDATE users SET name=?, phone=?, address=?, city=?, state=?, pincode=? WHERE id=?',
-      [name, phone, address, city, state, pincode, id]);
-    res.json({ message: 'User updated' });
+    const curr = existing[0];
+    const name = req.body.name !== undefined ? req.body.name : curr.name;
+    const phone = req.body.phone !== undefined ? req.body.phone : curr.phone;
+    const address = req.body.address !== undefined ? req.body.address : curr.address;
+    const city = req.body.city !== undefined ? req.body.city : curr.city;
+    const state = req.body.state !== undefined ? req.body.state : curr.state;
+    const pincode = req.body.pincode !== undefined ? req.body.pincode : curr.pincode;
+
+    await pool.query(
+      'UPDATE users SET name = ?, phone = ?, address = ?, city = ?, state = ?, pincode = ? WHERE id = ?',
+      [name, phone, address, city, state, pincode, id]
+    );
+
+    const [updated] = await pool.query(
+      'SELECT id, name, email, phone, role, address, city, state, pincode, status FROM users WHERE id = ?',
+      [id]
+    );
+
+    res.json({ message: 'User updated successfully', user: updated[0] });
   } catch (error) {
     next(error);
   }
@@ -66,7 +88,18 @@ const updateUser = async (req, res, next) => {
 const toggleUserStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
-    await pool.query('UPDATE users SET status = ? WHERE id = ?', [status, req.params.id]);
+    const userId = req.params.id;
+    await pool.query('UPDATE users SET status = ? WHERE id = ?', [status, userId]);
+
+    // Keep verification status in sync for NGO and Scrap Dealer accounts
+    if (status === 'inactive' || status === 'rejected') {
+      await pool.query('UPDATE ngos SET verification_status = "rejected" WHERE user_id = ?', [userId]);
+      await pool.query('UPDATE scrap_dealers SET verification_status = "rejected" WHERE user_id = ?', [userId]);
+    } else if (status === 'active') {
+      await pool.query('UPDATE ngos SET verification_status = "approved" WHERE user_id = ?', [userId]);
+      await pool.query('UPDATE scrap_dealers SET verification_status = "approved" WHERE user_id = ?', [userId]);
+    }
+
     res.json({ message: `User status set to ${status}` });
   } catch (error) {
     next(error);
@@ -75,8 +108,13 @@ const toggleUserStatus = async (req, res, next) => {
 
 const deleteUser = async (req, res, next) => {
   try {
-    await pool.query('DELETE FROM users WHERE id = ?', [req.params.id]);
-    res.json({ message: 'User deleted' });
+    const userId = req.params.id;
+    await pool.query('DELETE FROM ngos WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM scrap_dealers WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM notifications WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM impact_records WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+    res.json({ message: 'User deleted successfully' });
   } catch (error) {
     next(error);
   }

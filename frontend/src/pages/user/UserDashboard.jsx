@@ -23,13 +23,13 @@ const UserDashboard = () => {
 
         // Calculate stats from dashboard response
         const dashData = dashRes.data;
-        const donations = donationsRes.data || [];
-        const recycling = recyclingRes.data || [];
+        const donations = Array.isArray(donationsRes.data) ? donationsRes.data : [];
+        const recycling = Array.isArray(recyclingRes.data) ? recyclingRes.data : [];
 
         const totalDonations = donations.length;
-        const totalRecycled = recycling.length;
-        const activeRequests = [...donations, ...recycling].filter(r => r.status === 'PENDING' || r.status === 'ACCEPTED').length;
-        const completedRequests = [...donations, ...recycling].filter(r => r.status === 'COMPLETED').length;
+        const totalRecycled = Math.round(recycling.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0) * 10) / 10;
+        const activeRequests = [...donations, ...recycling].filter(r => r.status === 'PENDING' || r.status === 'ACCEPTED' || r.status === 'PICKUP_SCHEDULED').length;
+        const completedRequests = [...donations, ...recycling].filter(r => r.status === 'COMPLETED' || r.status === 'RECEIVED' || r.status === 'COLLECTED').length;
 
         setStats({ totalDonations, totalRecycled, activeRequests, completedRequests });
 
@@ -39,7 +39,7 @@ const UserDashboard = () => {
             id: d.request_id,
             type: 'Donation',
             item: d.item_name,
-            receiver: d.ngo_id ? `NGO #${d.ngo_id}` : '-',
+            receiver: d.ngo_name || (d.ngo_id ? `NGO #${d.ngo_id}` : '-'),
             status: d.status,
             date: d.created_at,
           })),
@@ -47,7 +47,7 @@ const UserDashboard = () => {
             id: r.request_id,
             type: 'Recycling',
             item: `${r.waste_category} (${r.quantity || '?'} ${r.quantity_unit || 'kg'})`,
-            receiver: r.scrap_dealer_id ? `Dealer #${r.scrap_dealer_id}` : '-',
+            receiver: r.dealer_name || (r.scrap_dealer_id ? `Dealer #${r.scrap_dealer_id}` : '-'),
             status: r.status,
             date: r.created_at,
           })),

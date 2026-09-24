@@ -15,7 +15,8 @@ const getNotifications = async (req, res, next) => {
 const markAsRead = async (req, res, next) => {
   try {
     const { id } = req.params;
-    if (id === 'all') {
+    const isAll = id === 'all' || !id || (req.path && req.path.includes('/all')) || (req.originalUrl && req.originalUrl.includes('/all'));
+    if (isAll) {
       await pool.query('UPDATE notifications SET is_read = 1 WHERE user_id = ?', [req.user.id]);
     } else {
       await pool.query('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?', [id, req.user.id]);
