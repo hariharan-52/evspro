@@ -77,8 +77,8 @@ export const AuthProvider = ({ children }) => {
     try {
       authInProgressRef.current = true;
       const data = await apiRegister(formData);
-      // Only auto-login for active users (not pending NGOs/Dealers)
-      if (data.token && data.user && data.user.status === 'active') {
+      // Auto-login for all registered users
+      if (data.token && data.user) {
         localStorage.setItem('token', data.token);
         setToken(data.token);
         setUser(data.user);

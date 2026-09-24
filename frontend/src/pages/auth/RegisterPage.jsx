@@ -87,8 +87,12 @@ const RegisterPage = () => {
       
       const res = await register(payload);
       
-      if (role === 'ngo' || role === 'scrapdealer') {
-        setSubmittedRole(role);
+      if (role === 'ngo') {
+        toast.success('Registration successful! Welcome to your NGO dashboard.');
+        navigate('/ngo/dashboard');
+      } else if (role === 'scrapdealer') {
+        toast.success('Registration successful! Welcome to your Scrap Dealer dashboard.');
+        navigate('/dealer/dashboard');
       } else {
         toast.success('Registration successful! Welcome to EcoDonate.');
         navigate('/dashboard');

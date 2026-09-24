@@ -48,7 +48,7 @@ const register = async (req, res, next) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const userStatus = (role === 'ngo' || role === 'scrapdealer') ? 'pending' : 'active';
+    const userStatus = 'active';
 
     const [result] = await pool.query(
       'INSERT INTO users (name, email, phone, password_hash, role, address, city, state, pincode, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -79,18 +79,14 @@ const register = async (req, res, next) => {
       );
     }
 
-    if (role === 'ngo' || role === 'scrapdealer') {
-      return res.status(201).json({
-        message: 'Registration submitted successfully! Your account is pending administrator verification and approval before you can log in.',
-        user: { id: userId, email, role, name, status: 'pending' },
-        requiresApproval: true
-      });
-    }
-
     const jwtSecret = process.env.JWT_SECRET || 'ecodonate_default_jwt_secret_key_2026';
     const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign({ id: userId, email, role, name }, jwtSecret, { expiresIn: jwtExpiresIn });
-    res.status(201).json({ message: 'User registered successfully', token, user: { id: userId, email, role, name, status: userStatus } });
+    res.status(201).json({
+      message: 'Account registered successfully! Welcome to EcoDonate.',
+      token,
+      user: { id: userId, email, role, name, status: userStatus }
+    });
   } catch (error) {
     console.error('[AUTH:REGISTER] ❌ EXCEPTION:', error.message, error.stack);
     next(error);
@@ -99,41 +95,40 @@ const register = async (req, res, next) => {
 
 const login = async (req, res, next) => {
   try {
-    const rawEmail = req.body.email || '';
+    const rawIdentifier = req.body.email || req.body.username || req.body.phone || req.body.userId || '';
     const rawPassword = req.body.password || '';
-    const email = rawEmail.trim().toLowerCase();
+    const identifier = rawIdentifier.trim();
     const password = rawPassword;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required.' });
+    if (!identifier || !password) {
+      return res.status(400).json({ message: 'Email / User ID and password are required.' });
     }
 
-    const [users] = await pool.query('SELECT * FROM users WHERE LOWER(email) = ?', [email]);
+    // Accept email, phone, or name (case-insensitive) as user identifier
+    const [users] = await pool.query(
+      'SELECT * FROM users WHERE LOWER(email) = ? OR phone = ? OR LOWER(name) = ?',
+      [identifier.toLowerCase(), identifier, identifier.toLowerCase()]
+    );
+
     if (users.length === 0) {
       // Perform constant-time dummy bcrypt comparison to prevent timing attacks and email enumeration
       await bcrypt.compare(password, '$2b$10$abcdefghijklmnopqrstuuNOPQRSTUVWXYZabcdefghijklmnopqr');
       recordFailedAttempt(req);
-      return res.status(401).json({ message: 'Invalid email address or password. Please check your credentials.' });
+      return res.status(401).json({ message: 'Invalid credentials. Please check your email / user ID and password.' });
     }
 
     const user = users[0];
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       recordFailedAttempt(req);
-      return res.status(401).json({ message: 'Invalid email address or password. Please check your credentials.' });
+      return res.status(401).json({ message: 'Invalid credentials. Please check your email / user ID and password.' });
     }
 
-    // Check NGO verification status
+    // Check if NGO account was specifically rejected
     if (user.role === 'ngo') {
       const [ngos] = await pool.query('SELECT verification_status, rejection_reason FROM ngos WHERE user_id = ?', [user.id]);
       const ngo = ngos[0];
-      const status = ngo?.verification_status || user.status;
-      if (status === 'pending') {
-        return res.status(403).json({
-          message: 'Your NGO account is pending Admin approval. You will be able to log in once your organization is verified and approved by the administrator.'
-        });
-      }
-      if (status === 'rejected') {
+      if (ngo?.verification_status === 'rejected') {
         const reason = ngo?.rejection_reason ? ` Reason: ${ngo.rejection_reason}` : '';
         return res.status(403).json({
           message: `Your NGO registration was rejected by the administrator.${reason}`
@@ -141,26 +136,16 @@ const login = async (req, res, next) => {
       }
     }
 
-    // Check Scrap Dealer verification status
+    // Check if Scrap Dealer account was specifically rejected
     if (user.role === 'scrapdealer') {
       const [dealers] = await pool.query('SELECT verification_status, rejection_reason FROM scrap_dealers WHERE user_id = ?', [user.id]);
       const dealer = dealers[0];
-      const status = dealer?.verification_status || user.status;
-      if (status === 'pending') {
-        return res.status(403).json({
-          message: 'Your Scrap Dealer account is pending Admin approval. You will be able to log in once your business is verified and approved by the administrator.'
-        });
-      }
-      if (status === 'rejected') {
+      if (dealer?.verification_status === 'rejected') {
         const reason = dealer?.rejection_reason ? ` Reason: ${dealer.rejection_reason}` : '';
         return res.status(403).json({
           message: `Your Scrap Dealer registration was rejected by the administrator.${reason}`
         });
       }
-    }
-
-    if (user.status === 'pending') {
-      return res.status(403).json({ message: 'Your account is pending administrator approval.' });
     }
 
     if (user.status === 'inactive' || user.status === 'rejected') {
@@ -174,6 +159,7 @@ const login = async (req, res, next) => {
     const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, jwtSecret, { expiresIn: jwtExpiresIn });
     res.json({ token, user: { id: user.id, email: user.email, role: user.role, name: user.name, status: user.status } });
+
   } catch (error) {
     console.error('[AUTH:LOGIN] ❌ EXCEPTION:', error.message, error.stack);
     next(error);

@@ -1,0 +1,18 @@
+{
+  "watch": [
+    "controllers",
+    "middleware",
+    "routes",
+    "services",
+    "config",
+    "app.js",
+    "server.js"
+  ],
+  "ignore": [
+    "*.sqlite*",
+    "ecodonate_local.sqlite*",
+    "uploads/**",
+    "scripts/**"
+  ],
+  "ext": "js,json"
+}

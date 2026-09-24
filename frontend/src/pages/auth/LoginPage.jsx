@@ -98,15 +98,15 @@ const LoginPage = () => {
           )}
           
           <div>
-            <label className="block text-xs font-semibold text-gray-700">Email Address</label>
+            <label className="block text-xs font-semibold text-gray-700">Email Address, User ID, or Phone</label>
             <input
-              type="email"
+              type="text"
               required
-              placeholder="e.g. user@example.com"
+              placeholder="e.g. user@example.com, username, or phone"
               className="mt-1 block w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm shadow-xs focus:ring-green-500 focus:border-green-500 bg-white"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              autoComplete="username"
             />
           </div>
 

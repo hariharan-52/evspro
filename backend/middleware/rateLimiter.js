@@ -20,8 +20,16 @@ const getClientIp = (req) => {
   return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection?.remoteAddress || 'unknown';
 };
 
+const isLocalhostIp = (ip) => {
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost';
+};
+
 const loginRateLimiter = (req, res, next) => {
   const ip = getClientIp(req);
+  if (process.env.NODE_ENV !== 'production' && isLocalhostIp(ip)) {
+    return next();
+  }
+
   const data = attemptsMap.get(ip);
   const now = Date.now();
 
@@ -37,6 +45,10 @@ const loginRateLimiter = (req, res, next) => {
 
 const recordFailedAttempt = (ipOrReq) => {
   const ip = typeof ipOrReq === 'string' ? ipOrReq : getClientIp(ipOrReq);
+  if (process.env.NODE_ENV !== 'production' && isLocalhostIp(ip)) {
+    return;
+  }
+
   const now = Date.now();
   const data = attemptsMap.get(ip) || { count: 0, firstAttempt: now, lockedUntil: null };
 
