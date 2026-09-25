@@ -12,7 +12,9 @@
     "*.sqlite*",
     "ecodonate_local.sqlite*",
     "uploads/**",
-    "scripts/**"
+    "scripts/**",
+    "data/**",
+    "*.json"
   ],
-  "ext": "js,json"
+  "ext": "js"
 }

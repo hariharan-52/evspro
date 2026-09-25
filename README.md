@@ -44,14 +44,24 @@ npm run dev
 
 ---
 
-## 🔑 Demo Credentials
+## 🔑 Authentication Methods
 
-| Role | Email | Password |
-|------|-------|----------|
-| **Admin** | admin@ecodonate.com | Admin@123 |
-| **User** | rahul@example.com | Password@123 |
-| **NGO (Approved)** | contact@greenearth.org | Password@123 |
-| **Scrap Dealer (Approved)** | info@ecoscrap.com | Password@123 |
+EcoDonate offers a modern, versatile authentication system designed for speed, security, and zero lockout:
+
+### 1. 📱 Passwordless One-Time Code (OTP) — *Recommended*
+- Enter your mobile phone number or email address.
+- Click **"Get Verification Code"**.
+- Input the 6-digit verification code (or tap the on-screen auto-fill chip) for instant, passwordless sign-in or 10-second account creation.
+
+### 2. ⚡ One-Tap Quick Role Switcher
+- Access pre-configured test accounts with a single click directly from the Login page:
+  - 🟢 **Donor / User** (`rahul@example.com`)
+  - 🏢 **NGO Foundation** (`contact@greenearth.org`)
+  - 🚛 **Scrap Dealer** (`info@ecoscrap.com`)
+  - 👑 **Admin Console** (`admin@ecodonate.com`)
+
+### 3. 🔑 Direct Password Authentication
+- Sign in with your **Email Address**, **Mobile Phone Number**, or **User Name** + Password.
 
 ---
 

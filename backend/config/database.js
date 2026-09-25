@@ -335,6 +335,12 @@ const testConnection = async () => {
     console.log('✅ Embedded database initialized with complete EcoDonate seed data.');
   }
   isInitialized = true;
+  try {
+    const UserRegistry = require('../data/userRegistry');
+    await UserRegistry.syncToDatabase(pool);
+  } catch (syncErr) {
+    console.warn('UserRegistry sync note:', syncErr.message);
+  }
 };
 
 const pool = {
