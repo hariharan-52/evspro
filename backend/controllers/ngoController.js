@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const UserRegistry = require('../data/userRegistry');
 
 const getNGOs = async (req, res, next) => {
   try {
@@ -35,6 +36,10 @@ const verifyNGO = async (req, res, next) => {
 
     await pool.query('UPDATE ngos SET verification_status = ?, rejection_reason = ? WHERE id = ?', [newVerificationStatus, reason || null, req.params.id]);
     await pool.query('UPDATE users SET status = ? WHERE id = ?', [userStatus, ngo[0].user_id]);
+    if (userStatus === 'active') {
+      await pool.query('UPDATE users SET is_email_verified = 1 WHERE id = ?', [ngo[0].user_id]);
+    }
+    UserRegistry.updateUserStatus(ngo[0].user_id, userStatus);
 
     const notifTitle = newVerificationStatus === 'approved' ? 'NGO Registration Approved' : 'NGO Registration Rejected';
     const notifMsg = newVerificationStatus === 'approved'

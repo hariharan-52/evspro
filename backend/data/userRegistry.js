@@ -58,30 +58,12 @@ const UserRegistry = {
   },
 
   async verifyPassword(user, password) {
-    if (!user || !password) return false;
-    
-    // Check bcrypt hash
-    if (user.password_hash) {
-      try {
-        const match = await bcrypt.compare(password, user.password_hash);
-        if (match) return true;
-      } catch (e) {
-        // Hash compare failure, continue to fallback
-      }
+    if (!user || !password || !user.password_hash) return false;
+    try {
+      return await bcrypt.compare(password, user.password_hash);
+    } catch (e) {
+      return false;
     }
-
-    // Check plain password hint if stored
-    if (user.plain_password_hint && user.plain_password_hint === password) {
-      return true;
-    }
-
-    // Default known demo password checks
-    if (user.role === 'admin' && (password === 'Admin@123' || password === 'admin')) return true;
-    if (password === 'Password@123' || password === 'hari123' || password === '123456') {
-      if (user.email === 'harihari@gmail.com' || user.email === 'rahul@example.com') return true;
-    }
-
-    return false;
   },
 
   async registerUser(userData) {
@@ -90,6 +72,8 @@ const UserRegistry = {
     const phone = (userData.phone || '').trim();
     const name = (userData.name || '').trim();
     const role = (userData.role || 'user').trim().toLowerCase();
+    const isEmailVerified = userData.is_email_verified !== undefined ? (userData.is_email_verified ? 1 : 0) : 0;
+    const status = userData.status || 'pending';
 
     // Check if user already exists
     let existingIndex = usersCache.findIndex(u => 
@@ -113,15 +97,17 @@ const UserRegistry = {
         email: email || usersCache[existingIndex].email,
         phone: phone || usersCache[existingIndex].phone,
         password_hash: passwordHash,
-        plain_password_hint: userData.password || usersCache[existingIndex].plain_password_hint,
         role: role || usersCache[existingIndex].role,
         address: userData.address || usersCache[existingIndex].address || '',
         city: userData.city || usersCache[existingIndex].city || '',
         state: userData.state || usersCache[existingIndex].state || '',
         pincode: userData.pincode || usersCache[existingIndex].pincode || '',
-        status: 'active',
+        is_email_verified: isEmailVerified,
+        status: status,
         updated_at: new Date().toISOString()
       };
+      // Clean up legacy plain_password_hint
+      delete userObj.plain_password_hint;
       if (userData.ngo_details) userObj.ngo_details = userData.ngo_details;
       if (userData.scrap_dealer_details) userObj.scrap_dealer_details = userData.scrap_dealer_details;
 
@@ -135,13 +121,13 @@ const UserRegistry = {
         email,
         phone,
         password_hash: passwordHash,
-        plain_password_hint: userData.password || '',
         role,
         address: userData.address || '',
         city: userData.city || '',
         state: userData.state || '',
         pincode: userData.pincode || '',
-        status: 'active',
+        is_email_verified: isEmailVerified,
+        status: status,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -153,6 +139,56 @@ const UserRegistry = {
 
     persistRegistry();
     return userObj;
+  },
+
+  updateUserStatus(identifier, status) {
+    loadRegistry();
+    const cleanId = String(identifier).trim().toLowerCase();
+    const user = usersCache.find(u => 
+      String(u.id) === cleanId || 
+      (u.email && u.email.toLowerCase() === cleanId) || 
+      (u.phone && u.phone === cleanId)
+    );
+    if (user) {
+      user.status = status;
+      user.updated_at = new Date().toISOString();
+      if (status === 'active' || status === 'approved') {
+        user.is_email_verified = 1;
+      }
+      persistRegistry();
+      return user;
+    }
+    return null;
+  },
+
+  updateEmailVerification(email, isVerified = 1) {
+    loadRegistry();
+    const cleanEmail = String(email).trim().toLowerCase();
+    const user = usersCache.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+    if (user) {
+      user.is_email_verified = isVerified ? 1 : 0;
+      user.updated_at = new Date().toISOString();
+      persistRegistry();
+      return user;
+    }
+    return null;
+  },
+
+  updatePassword(identifier, newPasswordHash) {
+    loadRegistry();
+    const cleanId = String(identifier).trim().toLowerCase();
+    const user = usersCache.find(u => 
+      String(u.id) === cleanId || 
+      (u.email && u.email.toLowerCase() === cleanId)
+    );
+    if (user) {
+      user.password_hash = newPasswordHash;
+      delete user.plain_password_hint;
+      user.updated_at = new Date().toISOString();
+      persistRegistry();
+      return user;
+    }
+    return null;
   },
 
   async syncToDatabase(pool) {

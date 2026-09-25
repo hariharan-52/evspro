@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const UserRegistry = require('../data/userRegistry');
 
 const getUsers = async (req, res, next) => {
   try {
@@ -87,20 +88,39 @@ const updateUser = async (req, res, next) => {
 
 const toggleUserStatus = async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const { status, reason } = req.body;
     const userId = req.params.id;
-    await pool.query('UPDATE users SET status = ? WHERE id = ?', [status, userId]);
+    const cleanStatus = status === 'approved' ? 'active' : status;
+
+    await pool.query('UPDATE users SET status = ? WHERE id = ?', [cleanStatus, userId]);
+
+    // Keep UserRegistry in sync so login is instantly unblocked/blocked
+    UserRegistry.updateUserStatus(userId, cleanStatus);
 
     // Keep verification status in sync for NGO and Scrap Dealer accounts
-    if (status === 'inactive' || status === 'rejected') {
+    if (cleanStatus === 'inactive' || cleanStatus === 'rejected') {
       await pool.query('UPDATE ngos SET verification_status = "rejected" WHERE user_id = ?', [userId]);
       await pool.query('UPDATE scrap_dealers SET verification_status = "rejected" WHERE user_id = ?', [userId]);
-    } else if (status === 'active') {
+    } else if (cleanStatus === 'active') {
+      await pool.query('UPDATE users SET is_email_verified = 1 WHERE id = ?', [userId]);
       await pool.query('UPDATE ngos SET verification_status = "approved" WHERE user_id = ?', [userId]);
       await pool.query('UPDATE scrap_dealers SET verification_status = "approved" WHERE user_id = ?', [userId]);
     }
 
-    res.json({ message: `User status set to ${status}` });
+    // Insert notification
+    const notifTitle = cleanStatus === 'active' ? 'Account Approved' : cleanStatus === 'rejected' ? 'Account Rejected' : 'Account Status Updated';
+    const notifMsg = cleanStatus === 'active'
+      ? 'Congratulations! Your EcoDonate account registration has been approved by the administrator. You now have full access to platform features.'
+      : `Your EcoDonate account registration was rejected by the administrator.${reason ? ' Reason: ' + reason : ''}`;
+
+    try {
+      await pool.query(
+        'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
+        [userId, notifTitle, notifMsg, 'account_alert']
+      );
+    } catch (e) {}
+
+    res.json({ message: `User status set to ${cleanStatus}`, status: cleanStatus });
   } catch (error) {
     next(error);
   }

@@ -94,7 +94,10 @@ async function initSQLite() {
       state TEXT,
       pincode TEXT,
       profile_image TEXT,
-      status TEXT DEFAULT 'active',
+      status TEXT DEFAULT 'pending',
+      is_email_verified INTEGER DEFAULT 0,
+      otp_code TEXT,
+      otp_expires_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -222,6 +225,22 @@ async function initSQLite() {
       }
     } catch (recMigErr) {
       console.warn('Recycling migration note:', recMigErr.message);
+    }
+
+    try {
+      const userInfo = sqliteDb.exec("PRAGMA table_info(users);");
+      const userCols = userInfo[0]?.values.map(c => c[1]) || [];
+      if (!userCols.includes('is_email_verified')) {
+        sqliteDb.run("ALTER TABLE users ADD COLUMN is_email_verified INTEGER DEFAULT 0;");
+      }
+      if (!userCols.includes('otp_code')) {
+        sqliteDb.run("ALTER TABLE users ADD COLUMN otp_code TEXT;");
+      }
+      if (!userCols.includes('otp_expires_at')) {
+        sqliteDb.run("ALTER TABLE users ADD COLUMN otp_expires_at DATETIME;");
+      }
+    } catch (userMigErr) {
+      console.warn('User migration note:', userMigErr.message);
     }
 
     const res = sqliteDb.exec("SELECT COUNT(*) as c FROM users");

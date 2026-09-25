@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const UserRegistry = require('../data/userRegistry');
 
 const getScrapDealers = async (req, res, next) => {
   try {
@@ -35,6 +36,10 @@ const verifyScrapDealer = async (req, res, next) => {
 
     await pool.query('UPDATE scrap_dealers SET verification_status = ?, rejection_reason = ? WHERE id = ?', [newVerificationStatus, reason || null, req.params.id]);
     await pool.query('UPDATE users SET status = ? WHERE id = ?', [userStatus, dealer[0].user_id]);
+    if (userStatus === 'active') {
+      await pool.query('UPDATE users SET is_email_verified = 1 WHERE id = ?', [dealer[0].user_id]);
+    }
+    UserRegistry.updateUserStatus(dealer[0].user_id, userStatus);
 
     const notifTitle = newVerificationStatus === 'approved' ? 'Scrap Dealer Registration Approved' : 'Scrap Dealer Registration Rejected';
     const notifMsg = newVerificationStatus === 'approved'

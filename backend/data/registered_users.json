@@ -4,50 +4,49 @@
     "name": "Admin User",
     "email": "admin@ecodonate.com",
     "phone": "9876543210",
-    "password_hash": "$2b$10$vDsz2F5Vz6K.Xf9.k/8aK.M0Yv0Z6bK4w0rM1K2n3p4q5r6s7t8u9",
-    "plain_password_hint": "Admin@123",
+    "password_hash": "$2b$10$3cr4ykcz9HOSsOoj7rIsae5rGVN7FeNv3xsiIvNu.Bg4/IQk.frVK",
     "role": "admin",
     "address": "Admin HQ",
     "city": "Delhi",
     "state": "Delhi",
     "pincode": "110001",
-    "status": "active"
+    "status": "active",
+    "is_email_verified": 1
   },
   {
     "id": 2,
     "name": "Rahul Sharma",
     "email": "rahul@example.com",
     "phone": "9876543211",
-    "password_hash": "$2b$10$Xk3a9L8vT9mY4xZ1eW2qR.B7cV4nP6tY8uI0oO2pA4sD6fG8hJ0kL",
-    "plain_password_hint": "Password@123",
+    "password_hash": "$2b$10$4kxrVtkPXCeBdJd1Q7JNzu4TPXBw5vPjo6Q1YVHcW9y3IS7xzxCcG",
     "role": "user",
     "address": "12 MG Road",
     "city": "Mumbai",
     "state": "Maharashtra",
     "pincode": "400001",
-    "status": "active"
+    "status": "active",
+    "is_email_verified": 1
   },
   {
     "id": 3,
     "name": "Hari User",
     "email": "harihari@gmail.com",
     "phone": "9876543220",
-    "password_hash": "$2b$10$Jk8x1N7pQ3wE9rT5yU7iO.V3bC5nM7lK9jH1gF3dD5sA7aP9oI1uY",
-    "plain_password_hint": "hari123",
+    "password_hash": "$2b$10$zexsjQymya37YNchx5sDlO0GkaIKso4/IUaF4ZYV2pfgTFwo1Bar.",
     "role": "user",
     "address": "24 Green Avenue",
     "city": "Chennai",
     "state": "Tamil Nadu",
     "pincode": "600001",
-    "status": "active"
+    "status": "active",
+    "is_email_verified": 1
   },
   {
     "id": 4,
     "name": "Green Earth NGO",
     "email": "contact@greenearth.org",
     "phone": "9876543214",
-    "password_hash": "$2b$10$Xk3a9L8vT9mY4xZ1eW2qR.B7cV4nP6tY8uI0oO2pA4sD6fG8hJ0kL",
-    "plain_password_hint": "Password@123",
+    "password_hash": "$2b$10$U7p47shKt4aRdHvda1Jta.0C/7KNWeJm1r6AYBAWXvIqOgQTikVKa",
     "role": "ngo",
     "address": "78 NGO Colony",
     "city": "Mumbai",
@@ -60,7 +59,8 @@
       "registration_number": "REG123456",
       "description": "Dedicated to environmental conservation and helping the needy.",
       "verification_status": "approved"
-    }
+    },
+    "is_email_verified": 1
   },
   {
     "id": 5,
@@ -68,7 +68,6 @@
     "email": "hariharingo@gmail.com",
     "phone": "9876543221",
     "password_hash": "$2b$10$Jk8x1N7pQ3wE9rT5yU7iO.V3bC5nM7lK9jH1gF3dD5sA7aP9oI1uY",
-    "plain_password_hint": "hari123",
     "role": "ngo",
     "address": "45 Care Foundation Road",
     "city": "Chennai",
@@ -81,15 +80,15 @@
       "registration_number": "REG789101",
       "description": "Empowering communities through sustainable donations and aid.",
       "verification_status": "approved"
-    }
+    },
+    "is_email_verified": 1
   },
   {
     "id": 6,
     "name": "Eco Scrap Traders",
     "email": "info@ecoscrap.com",
     "phone": "9876543216",
-    "password_hash": "$2b$10$Xk3a9L8vT9mY4xZ1eW2qR.B7cV4nP6tY8uI0oO2pA4sD6fG8hJ0kL",
-    "plain_password_hint": "Password@123",
+    "password_hash": "$2b$10$T6LwjmJb3x9MAmdGYjD5eeSWxOr47Cdgh4N.XmsBBfF29F8xRA7oq",
     "role": "scrapdealer",
     "address": "12 Industrial Area",
     "city": "Mumbai",
@@ -102,7 +101,8 @@
       "registration_number": "SCRAP987",
       "accepted_materials": "[\"Plastic\",\"Paper\",\"Metal\",\"E-Waste\"]",
       "verification_status": "approved"
-    }
+    },
+    "is_email_verified": 1
   },
   {
     "id": 7,
@@ -110,7 +110,6 @@
     "email": "harihariscrap@gmail.com",
     "phone": "9876543222",
     "password_hash": "$2b$10$Jk8x1N7pQ3wE9rT5yU7iO.V3bC5nM7lK9jH1gF3dD5sA7aP9oI1uY",
-    "plain_password_hint": "hari123",
     "role": "scrapdealer",
     "address": "88 Recycle Park",
     "city": "Chennai",
@@ -123,7 +122,8 @@
       "registration_number": "SCRAP555",
       "accepted_materials": "[\"Plastic\",\"Paper\",\"Metal\",\"E-Waste\",\"Glass\"]",
       "verification_status": "approved"
-    }
+    },
+    "is_email_verified": 1
   },
   {
     "id": 8,
@@ -131,7 +131,6 @@
     "email": "pendingngo@example.com",
     "phone": "9876543215",
     "password_hash": "$2b$10$Xk3a9L8vT9mY4xZ1eW2qR.B7cV4nP6tY8uI0oO2pA4sD6fG8hJ0kL",
-    "plain_password_hint": "Password@123",
     "role": "ngo",
     "address": "90 Charity Street",
     "city": "Delhi",
@@ -144,7 +143,8 @@
       "registration_number": "REG654321",
       "description": "Providing education and resources to underprivileged children.",
       "verification_status": "pending"
-    }
+    },
+    "is_email_verified": 1
   },
   {
     "id": 9,
@@ -152,7 +152,6 @@
     "email": "pendingscrap@example.com",
     "phone": "9876543217",
     "password_hash": "$2b$10$Xk3a9L8vT9mY4xZ1eW2qR.B7cV4nP6tY8uI0oO2pA4sD6fG8hJ0kL",
-    "plain_password_hint": "Password@123",
     "role": "scrapdealer",
     "address": "34 Scrap Yard",
     "city": "Bangalore",
@@ -165,7 +164,8 @@
       "registration_number": "SCRAP123",
       "accepted_materials": "[\"Paper\",\"Cardboard\",\"Glass\"]",
       "verification_status": "pending"
-    }
+    },
+    "is_email_verified": 1
   },
   {
     "id": 10,
@@ -173,7 +173,6 @@
     "email": "freshotpuser_1790344832164@ecodonate.local",
     "phone": "9876563202",
     "password_hash": "$2b$10$cKFsWDmzzpYTZYOn2kRTyurxmsBzYThnisJhFN5mP5rENHowHniJC",
-    "plain_password_hint": "EcoDonate@2026",
     "role": "user",
     "address": "",
     "city": "",
@@ -181,7 +180,8 @@
     "pincode": "",
     "status": "active",
     "created_at": "2026-09-25T14:00:32.301Z",
-    "updated_at": "2026-09-25T14:00:32.302Z"
+    "updated_at": "2026-09-25T14:00:32.302Z",
+    "is_email_verified": 1
   },
   {
     "id": 11,
@@ -189,7 +189,6 @@
     "email": "newuser_1790347550360@example.com",
     "phone": "9988776611",
     "password_hash": "$2b$10$U7iHWZnnMx9miAc0Ps.9PuFQK35rIvuOU3Xw29VHw2TkgXckvgECG",
-    "plain_password_hint": "MySecretPassword@2026",
     "role": "user",
     "address": "100 Green Blvd",
     "city": "Chennai",
@@ -197,7 +196,8 @@
     "pincode": "600001",
     "status": "active",
     "created_at": "2026-09-25T14:00:32.744Z",
-    "updated_at": "2026-09-25T14:45:51.713Z"
+    "updated_at": "2026-09-25T14:45:51.713Z",
+    "is_email_verified": 1
   },
   {
     "id": 12,
@@ -205,7 +205,6 @@
     "email": "freshotpuser_1790347550986@ecodonate.local",
     "phone": "9876588249",
     "password_hash": "$2b$10$gYz7oVG0nay0A4wIy7gTo.S5hrnFQ5krWJjx0mMGYdEf2.8ViMoHC",
-    "plain_password_hint": "EcoDonate@2026",
     "role": "user",
     "address": "",
     "city": "",
@@ -213,6 +212,23 @@
     "pincode": "",
     "status": "active",
     "created_at": "2026-09-25T14:45:51.119Z",
-    "updated_at": "2026-09-25T14:45:51.119Z"
+    "updated_at": "2026-09-25T14:45:51.119Z",
+    "is_email_verified": 1
+  },
+  {
+    "id": 13,
+    "name": "Priya Sharma",
+    "email": "priya_1790349331616@ecotest.com",
+    "phone": "9876543288",
+    "password_hash": "$2b$10$miOvcrQK9ub.TKfeAvg5L.nyPXtHN8dRO4avyX3mGrFavlv9m8wUC",
+    "role": "user",
+    "address": "",
+    "city": "",
+    "state": "",
+    "pincode": "",
+    "is_email_verified": 1,
+    "status": "active",
+    "created_at": "2026-09-25T15:15:31.726Z",
+    "updated_at": "2026-09-25T15:15:32.482Z"
   }
 ]

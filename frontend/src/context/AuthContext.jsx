@@ -2,9 +2,12 @@ import React, { createContext, useState, useEffect, useCallback, useRef } from '
 import {
   getMe,
   login as apiLogin,
-  sendOtp as apiSendOtp,
-  verifyOtp as apiVerifyOtp,
-  register as apiRegister,
+  registerRequest as apiRegisterRequest,
+  verifyRegistrationOtp as apiVerifyRegistrationOtp,
+  resendRegistrationOtp as apiResendRegistrationOtp,
+  forgotPasswordSendOtp as apiForgotPasswordSendOtp,
+  forgotPasswordVerifyOtp as apiForgotPasswordVerifyOtp,
+  forgotPasswordReset as apiForgotPasswordReset,
   logout as apiLogout
 } from '../services/auth';
 import { toast } from 'react-hot-toast';
@@ -87,74 +90,77 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   };
 
-  // 1. Passwordless OTP: Send Code
-  const sendOtp = useCallback(async (identifier) => {
-    try {
-      return await apiSendOtp(identifier);
-    } catch (error) {
-      const msg = error.response?.data?.message || 'Failed to send verification code';
-      toast.error(msg);
-      throw error;
-    }
-  }, []);
-
-  // 2. Passwordless OTP: Verify Code
-  const verifyOtp = useCallback(async (payload) => {
+  // 1. Production Login (Real database credentials)
+  const login = useCallback(async (email, password, rememberMe = false) => {
     try {
       authInProgressRef.current = true;
-      const data = await apiVerifyOtp(payload);
-
-      if (data.token && data.user) {
-        saveAuthSession(data.token, data.user);
-        toast.success(data.message || 'Signed in successfully!');
-      }
-      return data;
-    } catch (error) {
-      const msg = error.response?.data?.message || 'Verification failed';
-      toast.error(msg);
-      throw error;
-    } finally {
-      authInProgressRef.current = false;
-    }
-  }, []);
-
-
-  // 4. Standard Password Login
-  const login = useCallback(async (identifier, password) => {
-    try {
-      authInProgressRef.current = true;
-      const data = await apiLogin(identifier, password);
+      const data = await apiLogin(email, password, rememberMe);
       saveAuthSession(data.token, data.user);
-      toast.success('Login successful!');
+      toast.success(data.message || 'Login successful!');
       return data;
     } catch (error) {
-      const msg = error.response?.data?.message || 'Login failed';
-      toast.error(msg);
+      // Re-throw so page components can display specific error messages or status banners
       throw error;
     } finally {
       authInProgressRef.current = false;
     }
   }, []);
 
-  // 5. Registration
-  const register = useCallback(async (formData) => {
+  // 2. Registration Request (Step 1)
+  const registerRequest = useCallback(async (formData) => {
     try {
-      authInProgressRef.current = true;
-      const data = await apiRegister(formData);
-      if (data.token && data.user) {
-        saveAuthSession(data.token, data.user);
-      }
-      return data;
+      return await apiRegisterRequest(formData);
     } catch (error) {
-      const msg = error.response?.data?.message || 'Registration failed';
-      toast.error(msg);
       throw error;
-    } finally {
-      authInProgressRef.current = false;
     }
   }, []);
 
-  // 6. Logout
+  // 3. Verify Registration Email OTP (Step 2)
+  const verifyRegistrationOtp = useCallback(async (email, otp) => {
+    try {
+      return await apiVerifyRegistrationOtp(email, otp);
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
+  // 4. Resend Registration Email OTP
+  const resendRegistrationOtp = useCallback(async (email) => {
+    try {
+      return await apiResendRegistrationOtp(email);
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
+  // 5. Forgot Password: Send OTP
+  const forgotPasswordSendOtp = useCallback(async (email) => {
+    try {
+      return await apiForgotPasswordSendOtp(email);
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
+  // 6. Forgot Password: Verify OTP
+  const forgotPasswordVerifyOtp = useCallback(async (email, otp) => {
+    try {
+      return await apiForgotPasswordVerifyOtp(email, otp);
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
+  // 7. Forgot Password: Reset Password
+  const forgotPasswordReset = useCallback(async (payload) => {
+    try {
+      return await apiForgotPasswordReset(payload);
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
+  // 8. Logout
   const logout = useCallback(async () => {
     try {
       await apiLogout();
@@ -168,7 +174,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // 7. Refresh User
+  // 9. Refresh User
   const refreshUser = useCallback(async () => {
     try {
       const userData = await getMe();
@@ -180,7 +186,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // 8. Update User state locally
+  // 10. Update User locally
   const updateUser = useCallback((updatedFields) => {
     setUser(prev => {
       const nextUser = prev ? { ...prev, ...updatedFields } : prev;
@@ -198,10 +204,13 @@ export const AuthProvider = ({ children }) => {
         token,
         loading,
         isAuthenticated,
-        sendOtp,
-        verifyOtp,
         login,
-        register,
+        registerRequest,
+        verifyRegistrationOtp,
+        resendRegistrationOtp,
+        forgotPasswordSendOtp,
+        forgotPasswordVerifyOtp,
+        forgotPasswordReset,
         logout,
         refreshUser,
         updateUser

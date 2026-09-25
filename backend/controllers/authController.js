@@ -2,363 +2,564 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { pool } = require('../config/database');
 const UserRegistry = require('../data/userRegistry');
+const { sendRegistrationOtp, sendPasswordResetOtp } = require('../services/emailService');
 const { recordFailedAttempt, clearFailedAttempts } = require('../middleware/rateLimiter');
 
-// In-memory OTP store: identifier -> { otp, expiresAt, createdAt }
-const otpCache = new Map();
+// In-memory cache for pending registrations: email -> { ...data, password_hash, otp, expiresAt, attempts }
+const pendingRegistrations = new Map();
 
-// Helper to clean up expired OTPs periodically
+// In-memory cache for password resets: email -> { otp, expiresAt, attempts }
+const passwordResetStore = new Map();
+
+// Cleanup expired OTP records periodically
 setInterval(() => {
   const now = Date.now();
-  for (const [key, data] of otpCache.entries()) {
-    if (data.expiresAt < now) {
-      otpCache.delete(key);
-    }
+  for (const [key, data] of pendingRegistrations.entries()) {
+    if (data.expiresAt < now) pendingRegistrations.delete(key);
+  }
+  for (const [key, data] of passwordResetStore.entries()) {
+    if (data.expiresAt < now) passwordResetStore.delete(key);
   }
 }, 60 * 1000).unref();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ecodonate_default_jwt_secret_key_2026';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-const generateToken = (user) => {
+const generateToken = (user, expiresIn = JWT_EXPIRES_IN) => {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, name: user.name },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn }
   );
 };
 
 // ============================================================================
-// 1. SEND OTP (Passwordless authentication / phone or email verification)
+// 1. REGISTRATION REQUEST (Step 1: Validate, Hash, Send Email OTP)
 // ============================================================================
-const sendOtp = async (req, res) => {
+const registerRequest = async (req, res, next) => {
   try {
-    const rawIdentifier = req.body.identifier || req.body.email || req.body.phone || '';
-    const identifier = rawIdentifier.trim();
-
-    if (!identifier) {
-      return res.status(400).json({ message: 'Please provide a valid phone number or email address.' });
-    }
-
-    // Generate secure 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes TTL
-
-    // Store in cache normalized
-    const normalizedKey = identifier.toLowerCase();
-    otpCache.set(normalizedKey, { otp, expiresAt, createdAt: Date.now() });
-
-    // Check if account already exists
-    const existingUser = UserRegistry.findUser(identifier);
-
-    console.log(`[AUTH:OTP] Generated OTP for "${identifier}": ${otp} (User exists: ${Boolean(existingUser)})`);
-
-    // In production, we'd trigger SMS/Email; for smooth experience & dev demo, return OTP in response
-    return res.json({
-      success: true,
-      message: existingUser 
-        ? `Verification code sent for ${existingUser.name}.`
-        : 'Verification code sent. Enter code to continue.',
-      otp, // Included for instant auto-fill demo badge
-      identifier,
-      isRegistered: Boolean(existingUser),
-      userRole: existingUser ? existingUser.role : null
-    });
-  } catch (error) {
-    console.error('[AUTH:SEND_OTP] Error:', error.message);
-    res.status(500).json({ message: 'Failed to generate verification code. Please try again.' });
-  }
-};
-
-// ============================================================================
-// 2. VERIFY OTP & SIGN IN / AUTO-REGISTER
-// ============================================================================
-const verifyOtp = async (req, res) => {
-  try {
-    const rawIdentifier = req.body.identifier || req.body.email || req.body.phone || '';
-    const rawOtp = req.body.otp || '';
-    const identifier = rawIdentifier.trim();
-    const otp = rawOtp.trim();
-
-    if (!identifier || !otp) {
-      return res.status(400).json({ message: 'Identifier and OTP code are required.' });
-    }
-
-    const normalizedKey = identifier.toLowerCase();
-    const cached = otpCache.get(normalizedKey);
-
-    // Accept cached OTP or master test code '123456'
-    const isMasterOtp = (otp === '123456');
-    const isCachedMatch = (cached && cached.otp === otp && cached.expiresAt > Date.now());
-
-    if (!isMasterOtp && !isCachedMatch) {
-      return res.status(400).json({ message: 'Invalid or expired verification code. Please request a new code.' });
-    }
-
-    // OTP verified — remove from cache
-    otpCache.delete(normalizedKey);
-
-    // Find user in registry or DB
-    let user = UserRegistry.findUser(identifier);
-
-    // If user already exists -> instant login
-    if (user) {
-      if (user.status === 'inactive' || user.status === 'rejected') {
-        return res.status(403).json({ message: 'Your account has been deactivated by the administrator.' });
-      }
-
-      const token = generateToken(user);
-      return res.json({
-        success: true,
-        message: `Welcome back, ${user.name}!`,
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          status: user.status || 'active'
-        }
-      });
-    }
-
-    // If user does not exist yet:
-    // If name and role were provided in the request, create account automatically
-    const name = (req.body.name || '').trim();
-    const role = (req.body.role || 'user').trim().toLowerCase();
-
-    if (name) {
-      const isEmail = identifier.includes('@');
-      const newUserPayload = {
-        name,
-        email: isEmail ? identifier.toLowerCase() : `${name.toLowerCase().replace(/\s+/g, '')}_${Date.now()}@ecodonate.local`,
-        phone: isEmail ? (req.body.phone || '') : identifier,
-        password: req.body.password || 'EcoDonate@2026',
-        role: role || 'user',
-        address: req.body.address || '',
-        city: req.body.city || '',
-        state: req.body.state || '',
-        pincode: req.body.pincode || '',
-        status: 'active'
-      };
-
-      if (role === 'ngo') {
-        newUserPayload.ngo_details = {
-          ngo_name: req.body.ngo_name || name,
-          contact_person: req.body.contact_person || name,
-          registration_number: req.body.registration_number || '',
-          description: req.body.description || '',
-          verification_status: 'approved'
-        };
-      } else if (role === 'scrapdealer') {
-        newUserPayload.scrap_dealer_details = {
-          business_name: req.body.business_name || name,
-          contact_person: req.body.contact_person || name,
-          registration_number: req.body.registration_number || '',
-          accepted_materials: req.body.accepted_materials || ['Plastic', 'Paper'],
-          verification_status: 'approved'
-        };
-      }
-
-      const registeredUser = await UserRegistry.registerUser(newUserPayload);
-      
-      // Async sync to DB
-      UserRegistry.syncToDatabase(pool).catch(() => {});
-
-      const token = generateToken(registeredUser);
-      return res.status(201).json({
-        success: true,
-        message: 'Account registered and verified successfully! Welcome to EcoDonate.',
-        token,
-        user: {
-          id: registeredUser.id,
-          name: registeredUser.name,
-          email: registeredUser.email,
-          phone: registeredUser.phone,
-          role: registeredUser.role,
-          status: 'active'
-        }
-      });
-    }
-
-    // Prompt user to provide their Name and select Role to complete registration
-    return res.json({
-      success: true,
-      isNewUser: true,
-      message: 'Code verified! Please provide your name to complete account registration.',
-      identifier
-    });
-  } catch (error) {
-    console.error('[AUTH:VERIFY_OTP] Error:', error.message);
-    res.status(500).json({ message: 'Verification failed. Please try again.' });
-  }
-};
-
-
-// ============================================================================
-// 4. REGISTRATION (Streamlined, resilient, permanent persistence)
-// ============================================================================
-const register = async (req, res, next) => {
-  try {
-    const rawName = req.body.name || '';
-    const rawEmail = req.body.email || '';
-    const rawPhone = req.body.phone || '';
+    const rawRole = (req.body.role || 'user').trim().toLowerCase();
+    const rawName = (req.body.name || req.body.fullName || '').trim();
+    const rawEmail = (req.body.email || '').trim().toLowerCase();
+    const rawPhone = (req.body.phone || '').trim();
     const rawPassword = req.body.password || '';
-    const role = (req.body.role || 'user').trim().toLowerCase();
-    const address = (req.body.address || '').trim();
-    const city = (req.body.city || '').trim();
-    const state = (req.body.state || '').trim();
-    const pincode = (req.body.pincode || '').trim();
+    const rawConfirmPassword = req.body.confirmPassword || '';
+    const rawAddress = (req.body.address || '').trim();
+    const rawCity = (req.body.city || '').trim();
+    const rawState = (req.body.state || '').trim();
+    const rawPincode = (req.body.pincode || '').trim();
 
-    const name = rawName.trim();
-    const email = rawEmail.trim().toLowerCase();
-    const phone = rawPhone.trim();
-    const password = rawPassword;
-
-    if (!name || (!email && !phone)) {
-      return res.status(400).json({ message: 'Name and at least one contact method (email or phone) are required.' });
+    // 1. Public Role Validation: Admin is STRICTLY forbidden from public registration
+    const publicRoles = ['user', 'ngo', 'scrapdealer'];
+    if (!publicRoles.includes(rawRole)) {
+      return res.status(400).json({ message: 'Invalid registration role. Administrator accounts cannot be created publicly.' });
     }
 
-    // Role safety: Protect admin role from unauthorized self-signup
-    const allowedRoles = ['user', 'ngo', 'scrapdealer'];
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ message: 'Invalid registration role.' });
+    // 2. Validate mandatory fields
+    if (!rawName) {
+      return res.status(400).json({ message: 'Full name or organization name is required.' });
+    }
+    if (!rawEmail) {
+      return res.status(400).json({ message: 'Email address is required.' });
     }
 
-    // Check if user already exists in permanent registry
-    const existing = UserRegistry.findUser(email || phone);
-    if (existing) {
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(rawEmail)) {
+      return res.status(400).json({ message: 'Please provide a valid email address.' });
+    }
+
+    // Phone validation
+    const phoneClean = rawPhone.replace(/\D/g, '');
+    if (!rawPhone || phoneClean.length < 10) {
+      return res.status(400).json({ message: 'Please provide a valid 10-digit mobile phone number.' });
+    }
+
+    // Address validation
+    if (!rawAddress) {
+      return res.status(400).json({ message: 'Street address is required.' });
+    }
+
+    // Password requirements
+    if (!rawPassword || rawPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+    }
+    if (rawConfirmPassword && rawPassword !== rawConfirmPassword) {
+      return res.status(400).json({ message: 'Password and Confirm Password do not match.' });
+    }
+
+    // Role-specific verification requirements
+    let ngoDetails = null;
+    let scrapDealerDetails = null;
+
+    if (rawRole === 'ngo') {
+      const ngoName = (req.body.ngo_name || req.body.ngoName || rawName).trim();
+      const contactPerson = (req.body.contact_person || req.body.contactPerson || rawName).trim();
+      const regNumber = (req.body.registration_number || req.body.registrationNumber || '').trim();
+      const description = (req.body.description || '').trim();
+
+      if (!ngoName) return res.status(400).json({ message: 'NGO / Organization name is required.' });
+      if (!contactPerson) return res.status(400).json({ message: 'Contact person name is required.' });
+      if (!regNumber) return res.status(400).json({ message: 'NGO Registration / Trust / 80G Certificate number is required for verification.' });
+
+      ngoDetails = {
+        ngo_name: ngoName,
+        contact_person: contactPerson,
+        registration_number: regNumber,
+        description,
+        verification_status: 'pending'
+      };
+    } else if (rawRole === 'scrapdealer') {
+      const businessName = (req.body.business_name || req.body.businessName || rawName).trim();
+      const contactPerson = (req.body.contact_person || req.body.contactPerson || rawName).trim();
+      const regNumber = (req.body.registration_number || req.body.registrationNumber || '').trim();
+      const acceptedMaterials = req.body.accepted_materials || req.body.acceptedMaterials || ['Plastic', 'Paper', 'Metal'];
+
+      if (!businessName) return res.status(400).json({ message: 'Dealer / Business name is required.' });
+      if (!contactPerson) return res.status(400).json({ message: 'Owner / Contact person name is required.' });
+      if (!regNumber) return res.status(400).json({ message: 'Business Trade License / GST / Registration number is required for verification.' });
+
+      scrapDealerDetails = {
+        business_name: businessName,
+        contact_person: contactPerson,
+        registration_number: regNumber,
+        accepted_materials: acceptedMaterials,
+        verification_status: 'pending'
+      };
+    }
+
+    // 3. Check if email is already registered and active/approved
+    const existing = UserRegistry.findUser(rawEmail);
+    if (existing && (existing.is_email_verified === 1 || existing.status === 'active' || existing.status === 'approved' || existing.status === 'pending')) {
       return res.status(400).json({ 
-        message: `An account with this ${existing.email === email ? 'email' : 'phone number'} already exists. Please log in.` 
+        message: 'An account with this email address is already registered. Please log in or use Forgot Password.' 
       });
     }
 
-    // Build payload
-    const userPayload = {
-      name,
-      email: email || `${phone}@ecodonate.local`,
-      phone,
-      password: password || 'EcoDonate@2026',
-      role,
-      address,
-      city,
-      state,
-      pincode,
-      status: 'active'
-    };
-
-    if (role === 'ngo') {
-      userPayload.ngo_details = {
-        ngo_name: req.body.ngo_name || name,
-        contact_person: req.body.contact_person || req.body.contactPerson || name,
-        registration_number: req.body.registration_number || req.body.registrationNumber || '',
-        description: req.body.description || '',
-        verification_status: 'approved'
-      };
-    } else if (role === 'scrapdealer') {
-      userPayload.scrap_dealer_details = {
-        business_name: req.body.business_name || name,
-        contact_person: req.body.contact_person || req.body.contactPerson || name,
-        registration_number: req.body.registration_number || req.body.registrationNumber || '',
-        accepted_materials: req.body.accepted_materials || req.body.acceptedMaterials || ['Plastic', 'Paper', 'Metal'],
-        verification_status: 'approved'
-      };
+    // Also check database directly
+    try {
+      const [dbUsers] = await pool.query('SELECT id, is_email_verified, status FROM users WHERE LOWER(email) = ?', [rawEmail]);
+      if (dbUsers.length > 0 && (dbUsers[0].is_email_verified === 1 || dbUsers[0].status === 'active' || dbUsers[0].status === 'approved' || dbUsers[0].status === 'pending')) {
+        return res.status(400).json({ 
+          message: 'An account with this email address is already registered. Please log in or use Forgot Password.' 
+        });
+      }
+    } catch (e) {
+      // Continue if DB check fails
     }
 
-    // 1. Save immediately to indestructible UserRegistry (JSON file)
-    const newUser = await UserRegistry.registerUser(userPayload);
+    // 4. Securely hash password
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
 
-    // 2. Sync to active database (SQLite / MySQL)
-    UserRegistry.syncToDatabase(pool).catch((e) => console.warn('DB sync background notice:', e.message));
+    // 5. Generate secure 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-    // 3. Issue authentication token immediately
-    const token = generateToken(newUser);
+    // 6. Save in pending store
+    pendingRegistrations.set(rawEmail, {
+      name: rawName,
+      email: rawEmail,
+      phone: rawPhone,
+      password_hash: passwordHash,
+      role: rawRole,
+      address: rawAddress,
+      city: rawCity,
+      state: rawState,
+      pincode: rawPincode,
+      ngo_details: ngoDetails,
+      scrap_dealer_details: scrapDealerDetails,
+      otp,
+      expiresAt,
+      attempts: 0
+    });
 
-    console.log(`[AUTH:REGISTER] ✅ Account registered: ID=${newUser.id}, Name="${newUser.name}", Role="${newUser.role}"`);
+    // 7. Dispatch OTP via Email Service (NEVER expose OTP in response)
+    await sendRegistrationOtp(rawEmail, rawName, otp);
 
-    res.status(201).json({
+    console.log(`[AUTH:REGISTER_REQ] Email OTP dispatched to ${rawEmail} (${rawRole}). Awaiting verification.`);
+
+    res.json({
       success: true,
-      message: 'Account registered successfully! Welcome to EcoDonate.',
-      token,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: newUser.role,
-        name: newUser.name,
-        status: 'active'
-      }
+      message: `A 6-digit verification code has been sent to ${rawEmail}. Please verify your email to complete registration.`,
+      email: rawEmail
     });
   } catch (error) {
-    console.error('[AUTH:REGISTER] ❌ EXCEPTION:', error.message, error.stack);
+    console.error('[AUTH:REGISTER_REQ] Exception:', error.message);
     next(error);
   }
 };
 
 // ============================================================================
-// 5. LOGIN (Multi-identifier: Email, Username, or Phone Number + Password)
+// 2. VERIFY REGISTRATION OTP (Step 2: Verify OTP -> Enter PENDING APPROVAL)
+// ============================================================================
+const verifyRegistrationOtp = async (req, res, next) => {
+  try {
+    const rawEmail = (req.body.email || '').trim().toLowerCase();
+    const rawOtp = (req.body.otp || '').trim();
+
+    if (!rawEmail || !rawOtp) {
+      return res.status(400).json({ message: 'Email address and verification code are required.' });
+    }
+
+    const pending = pendingRegistrations.get(rawEmail);
+    if (!pending) {
+      return res.status(400).json({ 
+        message: 'No pending registration session found for this email, or the session has expired. Please register again.' 
+      });
+    }
+
+    // Check expiration
+    if (Date.now() > pending.expiresAt) {
+      pendingRegistrations.delete(rawEmail);
+      return res.status(400).json({ 
+        message: 'Verification code has expired. Please request a new code or register again.' 
+      });
+    }
+
+    // Verify OTP code
+    if (pending.otp !== rawOtp) {
+      pending.attempts = (pending.attempts || 0) + 1;
+      if (pending.attempts >= 5) {
+        pendingRegistrations.delete(rawEmail);
+        return res.status(400).json({ message: 'Too many incorrect attempts. Please register again.' });
+      }
+      return res.status(400).json({ message: 'Invalid verification code. Please check your email and try again.' });
+    }
+
+    // OTP Verified! Save user in indestructible registry with is_email_verified = 1 and status = 'pending'
+    const userPayload = {
+      name: pending.name,
+      email: pending.email,
+      phone: pending.phone,
+      password_hash: pending.password_hash,
+      role: pending.role,
+      address: pending.address,
+      city: pending.city,
+      state: pending.state,
+      pincode: pending.pincode,
+      is_email_verified: 1,
+      status: 'pending' // Awaiting Admin Approval
+    };
+
+    if (pending.ngo_details) userPayload.ngo_details = pending.ngo_details;
+    if (pending.scrap_dealer_details) userPayload.scrap_dealer_details = pending.scrap_dealer_details;
+
+    const newUser = await UserRegistry.registerUser(userPayload);
+
+    // Sync to database
+    UserRegistry.syncToDatabase(pool).catch(() => {});
+
+    // Clear pending registration session
+    pendingRegistrations.delete(rawEmail);
+
+    console.log(`[AUTH:OTP_VERIFIED] ✅ Email verified for ${newUser.name} (${newUser.email}). Account set to PENDING approval.`);
+
+    // Account enters PENDING state. No auth token is issued yet!
+    return res.status(201).json({
+      success: true,
+      status: 'pending',
+      message: 'Email verified successfully! Your account registration has been submitted and is currently awaiting Administrator approval.',
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        status: 'pending'
+      }
+    });
+  } catch (error) {
+    console.error('[AUTH:VERIFY_REG_OTP] Exception:', error.message);
+    next(error);
+  }
+};
+
+// ============================================================================
+// 3. RESEND REGISTRATION OTP
+// ============================================================================
+const resendRegistrationOtp = async (req, res, next) => {
+  try {
+    const rawEmail = (req.body.email || '').trim().toLowerCase();
+    if (!rawEmail) {
+      return res.status(400).json({ message: 'Email address is required.' });
+    }
+
+    const pending = pendingRegistrations.get(rawEmail);
+    if (!pending) {
+      return res.status(404).json({ 
+        message: 'No pending registration found for this email. Please register again.' 
+      });
+    }
+
+    // Generate new OTP and reset expiration
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    pending.otp = newOtp;
+    pending.expiresAt = Date.now() + 10 * 60 * 1000;
+    pending.attempts = 0;
+
+    await sendRegistrationOtp(pending.email, pending.name, newOtp);
+
+    console.log(`[AUTH:RESEND_OTP] New verification code dispatched to ${pending.email}`);
+
+    res.json({
+      success: true,
+      message: `A new 6-digit verification code has been sent to ${pending.email}.`
+    });
+  } catch (error) {
+    console.error('[AUTH:RESEND_OTP] Exception:', error.message);
+    next(error);
+  }
+};
+
+// ============================================================================
+// 4. FORGOT PASSWORD - STEP 1: SEND OTP TO REGISTERED EMAIL
+// ============================================================================
+const forgotPasswordSendOtp = async (req, res, next) => {
+  try {
+    const rawEmail = (req.body.email || '').trim().toLowerCase();
+    if (!rawEmail) {
+      return res.status(400).json({ message: 'Please provide your registered email address.' });
+    }
+
+    // Look up user in UserRegistry or Database
+    let user = UserRegistry.findUser(rawEmail);
+    if (!user) {
+      try {
+        const [dbUsers] = await pool.query('SELECT * FROM users WHERE LOWER(email) = ?', [rawEmail]);
+        if (dbUsers.length > 0) user = dbUsers[0];
+      } catch (e) {}
+    }
+
+    if (!user) {
+      return res.status(404).json({ 
+        message: 'No registered account found with this email address. Please check your email or create an account.' 
+      });
+    }
+
+    // Generate 6-digit reset code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    passwordResetStore.set(rawEmail, {
+      otp,
+      expiresAt,
+      attempts: 0
+    });
+
+    await sendPasswordResetOtp(user.email, user.name, otp);
+
+    console.log(`[AUTH:FORGOT_PWD_SEND] Password reset OTP sent to ${user.email}`);
+
+    res.json({
+      success: true,
+      message: `Password reset verification code has been sent to ${user.email}.`,
+      email: user.email
+    });
+  } catch (error) {
+    console.error('[AUTH:FORGOT_PWD_SEND] Exception:', error.message);
+    next(error);
+  }
+};
+
+// ============================================================================
+// 5. FORGOT PASSWORD - STEP 2: VERIFY OTP CODE
+// ============================================================================
+const forgotPasswordVerifyOtp = async (req, res, next) => {
+  try {
+    const rawEmail = (req.body.email || '').trim().toLowerCase();
+    const rawOtp = (req.body.otp || '').trim();
+
+    if (!rawEmail || !rawOtp) {
+      return res.status(400).json({ message: 'Email address and verification code are required.' });
+    }
+
+    const resetData = passwordResetStore.get(rawEmail);
+    if (!resetData) {
+      return res.status(400).json({ 
+        message: 'No active password reset session found for this email. Please request a new code.' 
+      });
+    }
+
+    if (Date.now() > resetData.expiresAt) {
+      passwordResetStore.delete(rawEmail);
+      return res.status(400).json({ 
+        message: 'Verification code has expired. Please request a new code.' 
+      });
+    }
+
+    if (resetData.otp !== rawOtp) {
+      resetData.attempts = (resetData.attempts || 0) + 1;
+      if (resetData.attempts >= 5) {
+        passwordResetStore.delete(rawEmail);
+        return res.status(400).json({ message: 'Too many incorrect attempts. Please request a new code.' });
+      }
+      return res.status(400).json({ message: 'Invalid verification code. Please check your email and try again.' });
+    }
+
+    // OTP verified! Generate secure, single-use password reset session token (15 mins)
+    const resetToken = jwt.sign(
+      { email: rawEmail, purpose: 'password_reset' },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    res.json({
+      success: true,
+      resetToken,
+      message: 'Code verified successfully! Please enter your new password.'
+    });
+  } catch (error) {
+    console.error('[AUTH:FORGOT_PWD_VERIFY] Exception:', error.message);
+    next(error);
+  }
+};
+
+// ============================================================================
+// 6. FORGOT PASSWORD - STEP 3: SET NEW PASSWORD
+// ============================================================================
+const forgotPasswordReset = async (req, res, next) => {
+  try {
+    const rawEmail = (req.body.email || '').trim().toLowerCase();
+    const rawResetToken = req.body.resetToken || '';
+    const rawNewPassword = req.body.newPassword || req.body.password || '';
+    const rawConfirmPassword = req.body.confirmPassword || '';
+
+    if (!rawEmail || !rawResetToken || !rawNewPassword) {
+      return res.status(400).json({ message: 'Email, reset token, and new password are required.' });
+    }
+
+    // Verify token
+    try {
+      const decoded = jwt.verify(rawResetToken, JWT_SECRET);
+      if (decoded.email !== rawEmail || decoded.purpose !== 'password_reset') {
+        return res.status(400).json({ message: 'Invalid or expired password reset session.' });
+      }
+    } catch (err) {
+      return res.status(400).json({ message: 'Password reset session has expired. Please start over.' });
+    }
+
+    if (rawNewPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+    }
+
+    if (rawConfirmPassword && rawNewPassword !== rawConfirmPassword) {
+      return res.status(400).json({ message: 'Password and Confirm Password do not match.' });
+    }
+
+    // Securely hash new password
+    const newPasswordHash = await bcrypt.hash(rawNewPassword, 10);
+
+    // Update in UserRegistry
+    UserRegistry.updatePassword(rawEmail, newPasswordHash);
+
+    // Update in Database
+    try {
+      await pool.query('UPDATE users SET password_hash = ? WHERE LOWER(email) = ?', [newPasswordHash, rawEmail]);
+    } catch (e) {
+      console.warn('DB password update warning:', e.message);
+    }
+
+    // Clear reset cache
+    passwordResetStore.delete(rawEmail);
+
+    console.log(`[AUTH:PASSWORD_RESET] ✅ Password successfully updated for ${rawEmail}`);
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully! You can now log in with your new password.'
+    });
+  } catch (error) {
+    console.error('[AUTH:FORGOT_PWD_RESET] Exception:', error.message);
+    next(error);
+  }
+};
+
+// ============================================================================
+// 7. LOGIN (Strict production authentication: Real credentials & approval check)
 // ============================================================================
 const login = async (req, res, next) => {
   try {
-    const rawIdentifier = req.body.email || req.body.username || req.body.phone || req.body.userId || '';
+    const rawEmail = (req.body.email || req.body.username || req.body.identifier || '').trim().toLowerCase();
     const rawPassword = req.body.password || '';
-    const identifier = rawIdentifier.trim();
-    const password = rawPassword;
+    const rememberMe = Boolean(req.body.rememberMe);
 
-    if (!identifier || !password) {
-      return res.status(400).json({ message: 'Email / Phone / Username and password are required.' });
+    if (!rawEmail || !rawPassword) {
+      return res.status(400).json({ message: 'Email address and password are required.' });
     }
 
-    // 1. Look up in permanent user registry first (fastest, indestructible)
-    let user = UserRegistry.findUser(identifier);
+    // 1. Look up user in indestructible UserRegistry
+    let user = UserRegistry.findUser(rawEmail);
 
-    // 2. If not found in registry, check SQL database
+    // 2. DB fallback
     if (!user) {
       try {
         const [dbUsers] = await pool.query(
-          'SELECT * FROM users WHERE LOWER(email) = ? OR phone = ? OR LOWER(name) = ?',
-          [identifier.toLowerCase(), identifier, identifier.toLowerCase()]
+          'SELECT * FROM users WHERE LOWER(email) = ? OR phone = ?',
+          [rawEmail, rawEmail]
         );
         if (dbUsers.length > 0) {
           user = dbUsers[0];
-          // Cache in UserRegistry so it's always available
           UserRegistry.registerUser(user).catch(() => {});
         }
       } catch (dbErr) {
-        console.warn('[AUTH:LOGIN] DB query fallback error:', dbErr.message);
+        console.warn('[AUTH:LOGIN] DB fallback warning:', dbErr.message);
       }
     }
 
     if (!user) {
       recordFailedAttempt(req);
-      return res.status(401).json({ 
-        message: 'No account found with this email, phone, or username. Please check your credentials or register.' 
-      });
+      return res.status(401).json({ message: 'Invalid email address or password.' });
     }
 
-    // Verify password
-    const match = await UserRegistry.verifyPassword(user, password);
+    // 3. Verify password strictly using bcrypt
+    const match = await UserRegistry.verifyPassword(user, rawPassword);
     if (!match) {
       recordFailedAttempt(req);
-      return res.status(401).json({ 
-        message: 'Incorrect password. You can also sign in instantly using the One-Time Code (OTP) option.' 
+      return res.status(401).json({ message: 'Invalid email address or password.' });
+    }
+
+    // 4. Check Email Verification Status
+    if (user.is_email_verified === 0 || user.is_email_verified === false) {
+      return res.status(403).json({
+        message: 'Your email address has not been verified yet. Please verify your email before logging in.',
+        code: 'EMAIL_NOT_VERIFIED',
+        email: user.email
       });
     }
 
-    // Check account status
-    if (user.status === 'inactive' || user.status === 'rejected') {
-      return res.status(403).json({ message: 'Your account has been deactivated by the administrator.' });
+    // 5. Check Admin Approval Status
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        message: 'Your account is awaiting Admin approval. Our administrator will review your application and approve access.',
+        code: 'ACCOUNT_PENDING'
+      });
+    }
+
+    if (user.status === 'rejected') {
+      return res.status(403).json({
+        message: 'Your account registration has been rejected by the administrator. Platform access is restricted.',
+        code: 'ACCOUNT_REJECTED'
+      });
+    }
+
+    if (user.status === 'inactive') {
+      return res.status(403).json({
+        message: 'Your account has been deactivated by the administrator.',
+        code: 'ACCOUNT_INACTIVE'
+      });
     }
 
     // Clear failed attempts counter
     clearFailedAttempts(req);
 
-    const token = generateToken(user);
-    console.log(`[AUTH:LOGIN] ✅ Successful login for "${user.name}" (${user.role})`);
+    // 6. Generate authenticated session token
+    const tokenExpires = rememberMe ? '30d' : JWT_EXPIRES_IN;
+    const token = generateToken(user, tokenExpires);
+
+    console.log(`[AUTH:LOGIN] ✅ Successful login: User="${user.name}", Role="${user.role}"`);
 
     res.json({
       success: true,
+      message: `Welcome back, ${user.name}!`,
       token,
       user: {
         id: user.id,
@@ -370,13 +571,13 @@ const login = async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('[AUTH:LOGIN] ❌ EXCEPTION:', error.message, error.stack);
+    console.error('[AUTH:LOGIN] Exception:', error.message);
     next(error);
   }
 };
 
 // ============================================================================
-// 6. GET CURRENT AUTHENTICATED USER (ME)
+// 8. GET CURRENT AUTHENTICATED USER (ME)
 // ============================================================================
 const getMe = async (req, res, next) => {
   try {
@@ -385,9 +586,7 @@ const getMe = async (req, res, next) => {
 
     if (!user) {
       const [users] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
-      if (users.length > 0) {
-        user = users[0];
-      }
+      if (users.length > 0) user = users[0];
     }
 
     if (!user) {
@@ -395,7 +594,7 @@ const getMe = async (req, res, next) => {
     }
 
     if (user.status === 'inactive' || user.status === 'rejected') {
-      return res.status(403).json({ message: 'Account deactivated' });
+      return res.status(403).json({ message: 'Account deactivated or rejected by administrator' });
     }
 
     // Attach NGO or Scrap Dealer details if applicable
@@ -413,15 +612,26 @@ const getMe = async (req, res, next) => {
 
     res.json(user);
   } catch (error) {
-    console.error('[AUTH:GETME] ❌ EXCEPTION:', error.message, error.stack);
+    console.error('[AUTH:GETME] Exception:', error.message);
     next(error);
   }
 };
 
+// ============================================================================
+// 9. BACKWARD COMPATIBLE REGISTER (Direct register fallback if ever called)
+// ============================================================================
+const register = async (req, res, next) => {
+  return registerRequest(req, res, next);
+};
+
 module.exports = {
-  sendOtp,
-  verifyOtp,
-  register,
+  registerRequest,
+  verifyRegistrationOtp,
+  resendRegistrationOtp,
+  forgotPasswordSendOtp,
+  forgotPasswordVerifyOtp,
+  forgotPasswordReset,
   login,
-  getMe
+  getMe,
+  register
 };
