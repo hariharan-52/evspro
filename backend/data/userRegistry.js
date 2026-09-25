@@ -1,8 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const bcrypt = require('bcrypt');
 
-const REGISTRY_FILE = path.join(__dirname, 'registered_users.json');
+const isVercel = Boolean(process.env.VERCEL);
+const REGISTRY_FILE = isVercel
+  ? path.join(os.tmpdir(), 'registered_users.json')
+  : path.join(__dirname, 'registered_users.json');
+const LOCAL_SEEDED_FILE = path.join(__dirname, 'registered_users.json');
 
 // In-memory cache for ultra-fast, lock-free access
 let usersCache = [];
@@ -11,6 +16,15 @@ function loadRegistry() {
   try {
     if (fs.existsSync(REGISTRY_FILE)) {
       const data = fs.readFileSync(REGISTRY_FILE, 'utf8');
+      usersCache = JSON.parse(data);
+    } else if (isVercel && fs.existsSync(LOCAL_SEEDED_FILE)) {
+      const data = fs.readFileSync(LOCAL_SEEDED_FILE, 'utf8');
+      usersCache = JSON.parse(data);
+      try {
+        fs.writeFileSync(REGISTRY_FILE, data, 'utf8');
+      } catch (writeErr) {}
+    } else if (fs.existsSync(LOCAL_SEEDED_FILE)) {
+      const data = fs.readFileSync(LOCAL_SEEDED_FILE, 'utf8');
       usersCache = JSON.parse(data);
     } else {
       usersCache = [];

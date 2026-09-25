@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
 
+const os = require('os');
+
 let activeEngine = 'mysql';
 let mysqlPool = null;
 let sqliteDb = null;
@@ -11,7 +13,7 @@ let isInitialized = false;
 
 const isVercel = Boolean(process.env.VERCEL);
 const DB_FILE = isVercel
-  ? path.join('/tmp', 'ecodonate_local.sqlite')
+  ? path.join(os.tmpdir(), 'ecodonate_local.sqlite')
   : path.join(__dirname, '../ecodonate_local.sqlite');
 const LOCAL_SEEDED_FILE = path.join(__dirname, '../ecodonate_local.sqlite');
 
