@@ -4,7 +4,6 @@ import {
   login as apiLogin,
   sendOtp as apiSendOtp,
   verifyOtp as apiVerifyOtp,
-  quickLogin as apiQuickLogin,
   register as apiRegister,
   logout as apiLogout
 } from '../services/auth';
@@ -119,24 +118,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // 3. Quick One-Click Demo Login
-  const quickLogin = useCallback(async (role, email) => {
-    try {
-      authInProgressRef.current = true;
-      const data = await apiQuickLogin(role, email);
-      if (data.token && data.user) {
-        saveAuthSession(data.token, data.user);
-        toast.success(data.message || `Signed in as ${data.user.name}`);
-      }
-      return data;
-    } catch (error) {
-      const msg = error.response?.data?.message || 'Quick login failed';
-      toast.error(msg);
-      throw error;
-    } finally {
-      authInProgressRef.current = false;
-    }
-  }, []);
 
   // 4. Standard Password Login
   const login = useCallback(async (identifier, password) => {
@@ -219,7 +200,6 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         sendOtp,
         verifyOtp,
-        quickLogin,
         login,
         register,
         logout,

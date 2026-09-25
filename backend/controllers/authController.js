@@ -195,58 +195,6 @@ const verifyOtp = async (req, res) => {
   }
 };
 
-// ============================================================================
-// 3. ONE-CLICK DEMO / QUICK ROLE LOGIN
-// ============================================================================
-const quickLogin = async (req, res) => {
-  try {
-    const requestedRole = (req.body.role || 'user').trim().toLowerCase();
-    const requestedEmail = (req.body.email || '').trim().toLowerCase();
-
-    let targetEmail;
-    if (requestedEmail) {
-      targetEmail = requestedEmail;
-    } else {
-      switch (requestedRole) {
-        case 'admin':
-          targetEmail = 'admin@ecodonate.com';
-          break;
-        case 'ngo':
-          targetEmail = 'contact@greenearth.org';
-          break;
-        case 'scrapdealer':
-          targetEmail = 'info@ecoscrap.com';
-          break;
-        default:
-          targetEmail = 'rahul@example.com';
-          break;
-      }
-    }
-
-    const user = UserRegistry.findUser(targetEmail);
-    if (!user) {
-      return res.status(404).json({ message: `Demo account for ${requestedRole} not found.` });
-    }
-
-    const token = generateToken(user);
-    return res.json({
-      success: true,
-      message: `Directly signed in as ${user.name} (${user.role.toUpperCase()})`,
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        status: user.status || 'active'
-      }
-    });
-  } catch (error) {
-    console.error('[AUTH:QUICK_LOGIN] Error:', error.message);
-    res.status(500).json({ message: 'Quick login failed.' });
-  }
-};
 
 // ============================================================================
 // 4. REGISTRATION (Streamlined, resilient, permanent persistence)
@@ -473,7 +421,6 @@ const getMe = async (req, res, next) => {
 module.exports = {
   sendOtp,
   verifyOtp,
-  quickLogin,
   register,
   login,
   getMe

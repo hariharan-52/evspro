@@ -161,21 +161,6 @@ async function runTestSuite() {
     const loginData3 = await loginRes3.json();
     assert(loginRes3.status === 200, 'Re-login with Username/Name succeeded');
 
-    // -------------------------------------------------------------
-    // Test 6: One-Click Demo Quick Login for All Roles
-    // -------------------------------------------------------------
-    console.log('\n--- Step 6: Quick Demo Login for All Roles ---');
-    const roles = ['user', 'ngo', 'scrapdealer', 'admin'];
-    for (const r of roles) {
-      const qRes = await fetch(`${baseUrl}/api/auth/quick-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: r })
-      });
-      const qData = await qRes.json();
-      assert(qRes.status === 200, `Quick Login for role '${r}' succeeded`, JSON.stringify(qData));
-      assert(qData.user.role === r, `Returned user has role '${r}'`);
-    }
 
     // -------------------------------------------------------------
     // Test 7: Verify User Persistence in Registry Store

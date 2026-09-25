@@ -15,10 +15,6 @@ export const verifyOtp = async (payload) => {
   return response.data;
 };
 
-export const quickLogin = async (role, email) => {
-  const response = await api.post('/auth/quick-login', { role, email });
-  return response.data;
-};
 
 export const register = async (data) => {
   const response = await api.post('/auth/register', data);

@@ -5,7 +5,6 @@ const { loginRateLimiter } = require('../middleware/rateLimiter');
 const {
   sendOtp,
   verifyOtp,
-  quickLogin,
   register,
   login,
   getMe
@@ -14,9 +13,6 @@ const {
 // Passwordless OTP Authentication routes
 router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
-
-// One-tap Demo / Role switcher route
-router.post('/quick-login', quickLogin);
 
 // Standard registration and password login
 router.post('/register', register);

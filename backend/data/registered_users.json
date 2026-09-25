@@ -186,9 +186,9 @@
   {
     "id": 11,
     "name": "Persistent Tester",
-    "email": "newuser_1790344831462@example.com",
+    "email": "newuser_1790347550360@example.com",
     "phone": "9988776611",
-    "password_hash": "$2b$10$ZlzsZ3fcIyTL1N/4nLYdnObiG4d08741Y6Okp5kSf2J7MrfWUSSNm",
+    "password_hash": "$2b$10$U7iHWZnnMx9miAc0Ps.9PuFQK35rIvuOU3Xw29VHw2TkgXckvgECG",
     "plain_password_hint": "MySecretPassword@2026",
     "role": "user",
     "address": "100 Green Blvd",
@@ -197,6 +197,22 @@
     "pincode": "600001",
     "status": "active",
     "created_at": "2026-09-25T14:00:32.744Z",
-    "updated_at": "2026-09-25T14:00:32.744Z"
+    "updated_at": "2026-09-25T14:45:51.713Z"
+  },
+  {
+    "id": 12,
+    "name": "Fresh OTP User",
+    "email": "freshotpuser_1790347550986@ecodonate.local",
+    "phone": "9876588249",
+    "password_hash": "$2b$10$gYz7oVG0nay0A4wIy7gTo.S5hrnFQ5krWJjx0mMGYdEf2.8ViMoHC",
+    "plain_password_hint": "EcoDonate@2026",
+    "role": "user",
+    "address": "",
+    "city": "",
+    "state": "",
+    "pincode": "",
+    "status": "active",
+    "created_at": "2026-09-25T14:45:51.119Z",
+    "updated_at": "2026-09-25T14:45:51.119Z"
   }
 ]

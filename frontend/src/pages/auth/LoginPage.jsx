@@ -4,17 +4,12 @@ import {
   Leaf,
   Smartphone,
   KeyRound,
-  Zap,
   ArrowRight,
   Eye,
   EyeOff,
   CheckCircle2,
   RefreshCw,
   AlertCircle,
-  Building2,
-  Truck,
-  User,
-  ShieldCheck,
   Sparkles
 } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
@@ -22,7 +17,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { toast } from 'react-hot-toast';
 
 const LoginPage = () => {
-  // Tabs: 'otp' | 'password' | 'demo'
+  // Tabs: 'otp' | 'password'
   const [authMethod, setAuthMethod] = useState('otp');
 
   // OTP Mode State
@@ -44,7 +39,7 @@ const LoginPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const { login, sendOtp, verifyOtp, quickLogin, isAuthenticated, user } = useAuth();
+  const { login, sendOtp, verifyOtp, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -171,22 +166,6 @@ const LoginPage = () => {
     }
   };
 
-  // --------------------------------------------------------------------------
-  // Instant Demo Role Login Handler
-  // --------------------------------------------------------------------------
-  const handleQuickLogin = async (role) => {
-    setError('');
-    setIsSubmitting(true);
-    try {
-      const data = await quickLogin(role);
-      redirectToDashboard(data.user.role);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Quick login failed.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="min-h-[88vh] flex items-center justify-center bg-gradient-to-b from-gray-50 to-green-50/30 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6 bg-white p-7 sm:p-8 rounded-3xl shadow-xl border border-gray-100 transition-all">
@@ -203,44 +182,31 @@ const LoginPage = () => {
         </div>
 
         {/* Auth Method Navigation Tabs */}
-        <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-gray-100/90 rounded-2xl border border-gray-200/80">
+        <div className="grid grid-cols-2 gap-2 p-1.5 bg-gray-100/90 rounded-2xl border border-gray-200/80">
           <button
             type="button"
             onClick={() => { setAuthMethod('otp'); setError(''); }}
-            className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1.5 transition-all ${
+            className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
               authMethod === 'otp'
                 ? 'bg-white text-green-700 shadow-sm border border-gray-200/50'
                 : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            <Smartphone size={15} className={authMethod === 'otp' ? 'text-green-600' : 'text-gray-400'} />
-            <span>One-Time Code</span>
+            <Smartphone size={16} className={authMethod === 'otp' ? 'text-green-600' : 'text-gray-400'} />
+            <span>One-Time Code (OTP)</span>
           </button>
 
           <button
             type="button"
             onClick={() => { setAuthMethod('password'); setError(''); }}
-            className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1.5 transition-all ${
+            className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
               authMethod === 'password'
                 ? 'bg-white text-green-700 shadow-sm border border-gray-200/50'
                 : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            <KeyRound size={15} className={authMethod === 'password' ? 'text-green-600' : 'text-gray-400'} />
-            <span>Password</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setAuthMethod('demo'); setError(''); }}
-            className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1.5 transition-all ${
-              authMethod === 'demo'
-                ? 'bg-white text-amber-700 shadow-sm border border-gray-200/50'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <Zap size={15} className={authMethod === 'demo' ? 'text-amber-500' : 'text-gray-400'} />
-            <span>Quick Demo</span>
+            <KeyRound size={16} className={authMethod === 'password' ? 'text-green-600' : 'text-gray-400'} />
+            <span>Password Sign In</span>
           </button>
         </div>
 
@@ -453,93 +419,6 @@ const LoginPage = () => {
               {isSubmitting ? <LoadingSpinner size="small" className="text-white" /> : 'Sign in with Password'}
             </button>
           </form>
-        )}
-
-        {/* ================================================================= */}
-        {/* METHOD 3: ONE-TAP DEMO ROLE SWITCHER */}
-        {/* ================================================================= */}
-        {authMethod === 'demo' && (
-          <div className="space-y-2.5 animate-fadeIn">
-            <p className="text-xs text-gray-500 text-center font-medium mb-3">
-              One-tap direct login into pre-configured accounts:
-            </p>
-
-            {/* User */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleQuickLogin('user')}
-              className="w-full p-3.5 bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 border border-green-200 rounded-2xl flex items-center justify-between text-left transition-all hover:scale-[1.01] shadow-xs"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-600 text-white flex items-center justify-center font-bold">
-                  <User size={20} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900">Donor / Citizen</h4>
-                  <p className="text-[11px] text-gray-500">Rahul Sharma (rahul@example.com)</p>
-                </div>
-              </div>
-              <ArrowRight size={16} className="text-green-700" />
-            </button>
-
-            {/* NGO */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleQuickLogin('ngo')}
-              className="w-full p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-2xl flex items-center justify-between text-left transition-all hover:scale-[1.01] shadow-xs"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
-                  <Building2 size={20} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900">NGO Foundation</h4>
-                  <p className="text-[11px] text-gray-500">Green Earth NGO (contact@greenearth.org)</p>
-                </div>
-              </div>
-              <ArrowRight size={16} className="text-blue-700" />
-            </button>
-
-            {/* Scrap Dealer */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleQuickLogin('scrapdealer')}
-              className="w-full p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border border-amber-200 rounded-2xl flex items-center justify-between text-left transition-all hover:scale-[1.01] shadow-xs"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold">
-                  <Truck size={20} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900">Scrap Dealer / Recycler</h4>
-                  <p className="text-[11px] text-gray-500">Eco Scrap Traders (info@ecoscrap.com)</p>
-                </div>
-              </div>
-              <ArrowRight size={16} className="text-amber-700" />
-            </button>
-
-            {/* Admin */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleQuickLogin('admin')}
-              className="w-full p-3.5 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border border-purple-200 rounded-2xl flex items-center justify-between text-left transition-all hover:scale-[1.01] shadow-xs"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold">
-                  <ShieldCheck size={20} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900">Platform Administrator</h4>
-                  <p className="text-[11px] text-gray-500">Admin Control Console (admin@ecodonate.com)</p>
-                </div>
-              </div>
-              <ArrowRight size={16} className="text-purple-700" />
-            </button>
-          </div>
         )}
 
         {/* Footer info */}
