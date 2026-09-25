@@ -118,6 +118,8 @@ const UserRegistry = {
         pincode: userData.pincode || usersCache[existingIndex].pincode || '',
         is_email_verified: isEmailVerified,
         status: status,
+        otp_code: userData.otp_code !== undefined ? userData.otp_code : usersCache[existingIndex].otp_code,
+        otp_expires_at: userData.otp_expires_at !== undefined ? userData.otp_expires_at : usersCache[existingIndex].otp_expires_at,
         updated_at: new Date().toISOString()
       };
       // Clean up legacy plain_password_hint
@@ -142,6 +144,8 @@ const UserRegistry = {
         pincode: userData.pincode || '',
         is_email_verified: isEmailVerified,
         status: status,
+        otp_code: userData.otp_code || null,
+        otp_expires_at: userData.otp_expires_at || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -153,6 +157,34 @@ const UserRegistry = {
 
     persistRegistry();
     return userObj;
+  },
+
+  setOtp(email, otp, expiresAt) {
+    loadRegistry();
+    const cleanEmail = String(email).trim().toLowerCase();
+    const user = usersCache.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+    if (user) {
+      user.otp_code = String(otp);
+      user.otp_expires_at = expiresAt;
+      user.updated_at = new Date().toISOString();
+      persistRegistry();
+      return user;
+    }
+    return null;
+  },
+
+  clearOtp(email) {
+    loadRegistry();
+    const cleanEmail = String(email).trim().toLowerCase();
+    const user = usersCache.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+    if (user) {
+      delete user.otp_code;
+      delete user.otp_expires_at;
+      user.updated_at = new Date().toISOString();
+      persistRegistry();
+      return user;
+    }
+    return null;
   },
 
   updateUserStatus(identifier, status) {

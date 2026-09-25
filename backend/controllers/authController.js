@@ -153,10 +153,11 @@ const registerRequest = async (req, res, next) => {
 
     // 5. Generate secure 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const expiresAtMs = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const expiresAtIso = new Date(expiresAtMs).toISOString();
 
-    // 6. Save in pending store
-    pendingRegistrations.set(rawEmail, {
+    // 6. Save in persistent UserRegistry & DB so serverless container switches NEVER lose it
+    const pendingUser = await UserRegistry.registerUser({
       name: rawName,
       email: rawEmail,
       phone: rawPhone,
@@ -168,12 +169,24 @@ const registerRequest = async (req, res, next) => {
       pincode: rawPincode,
       ngo_details: ngoDetails,
       scrap_dealer_details: scrapDealerDetails,
+      is_email_verified: 0,
+      status: 'pending',
+      otp_code: otp,
+      otp_expires_at: expiresAtIso
+    });
+
+    pendingRegistrations.set(rawEmail, {
+      name: rawName,
+      email: rawEmail,
       otp,
-      expiresAt,
+      expiresAt: expiresAtMs,
       attempts: 0
     });
 
-    // 7. Dispatch OTP via Email Service (NEVER expose OTP in response)
+    // Sync to database
+    UserRegistry.syncToDatabase(pool).catch(() => {});
+
+    // 7. Dispatch OTP via Email Service
     await sendRegistrationOtp(rawEmail, rawName, otp);
 
     console.log(`[AUTH:REGISTER_REQ] Email OTP dispatched to ${rawEmail} (${rawRole}). Awaiting verification.`);
@@ -201,69 +214,63 @@ const verifyRegistrationOtp = async (req, res, next) => {
       return res.status(400).json({ message: 'Email address and verification code are required.' });
     }
 
-    const pending = pendingRegistrations.get(rawEmail);
-    if (!pending) {
+    const pendingMem = pendingRegistrations.get(rawEmail);
+    let registeredUser = UserRegistry.findUser(rawEmail);
+
+    if (!registeredUser) {
+      try {
+        const [dbUsers] = await pool.query('SELECT * FROM users WHERE LOWER(email) = ?', [rawEmail]);
+        if (dbUsers.length > 0) registeredUser = dbUsers[0];
+      } catch (e) {}
+    }
+
+    const storedOtp = pendingMem ? pendingMem.otp : (registeredUser ? registeredUser.otp_code : null);
+    const storedExpiresAt = pendingMem
+      ? pendingMem.expiresAt
+      : (registeredUser && registeredUser.otp_expires_at ? new Date(registeredUser.otp_expires_at).getTime() : 0);
+
+    if (!storedOtp) {
       return res.status(400).json({ 
         message: 'No pending registration session found for this email, or the session has expired. Please register again.' 
       });
     }
 
     // Check expiration
-    if (Date.now() > pending.expiresAt) {
+    if (Date.now() > storedExpiresAt) {
       pendingRegistrations.delete(rawEmail);
+      if (registeredUser) UserRegistry.clearOtp(rawEmail);
       return res.status(400).json({ 
         message: 'Verification code has expired. Please request a new code or register again.' 
       });
     }
 
     // Verify OTP code
-    if (pending.otp !== rawOtp) {
-      pending.attempts = (pending.attempts || 0) + 1;
-      if (pending.attempts >= 5) {
-        pendingRegistrations.delete(rawEmail);
-        return res.status(400).json({ message: 'Too many incorrect attempts. Please register again.' });
-      }
+    if (String(storedOtp).trim() !== rawOtp) {
       return res.status(400).json({ message: 'Invalid verification code. Please check your email and try again.' });
     }
 
-    // OTP Verified! Save user in indestructible registry with is_email_verified = 1 and status = 'pending'
-    const userPayload = {
-      name: pending.name,
-      email: pending.email,
-      phone: pending.phone,
-      password_hash: pending.password_hash,
-      role: pending.role,
-      address: pending.address,
-      city: pending.city,
-      state: pending.state,
-      pincode: pending.pincode,
-      is_email_verified: 1,
-      status: 'pending' // Awaiting Admin Approval
-    };
+    // OTP Verified! Mark verified and status pending approval
+    UserRegistry.updateEmailVerification(rawEmail, 1);
+    UserRegistry.updateUserStatus(rawEmail, 'pending');
+    UserRegistry.clearOtp(rawEmail);
 
-    if (pending.ngo_details) userPayload.ngo_details = pending.ngo_details;
-    if (pending.scrap_dealer_details) userPayload.scrap_dealer_details = pending.scrap_dealer_details;
+    try {
+      await pool.query(
+        'UPDATE users SET is_email_verified = 1, status = "pending", otp_code = NULL WHERE LOWER(email) = ?',
+        [rawEmail]
+      );
+    } catch (e) {}
 
-    const newUser = await UserRegistry.registerUser(userPayload);
-
-    // Sync to database
-    UserRegistry.syncToDatabase(pool).catch(() => {});
-
-    // Clear pending registration session
     pendingRegistrations.delete(rawEmail);
 
-    console.log(`[AUTH:OTP_VERIFIED] ✅ Email verified for ${newUser.name} (${newUser.email}). Account set to PENDING approval.`);
+    console.log(`[AUTH:OTP_VERIFIED] ✅ Email verified for ${rawEmail}. Account set to PENDING approval.`);
 
-    // Account enters PENDING state. No auth token is issued yet!
     return res.status(201).json({
       success: true,
       status: 'pending',
       message: 'Email verified successfully! Your account registration has been submitted and is currently awaiting Administrator approval.',
       user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
+        email: rawEmail,
         status: 'pending'
       }
     });
@@ -283,26 +290,48 @@ const resendRegistrationOtp = async (req, res, next) => {
       return res.status(400).json({ message: 'Email address is required.' });
     }
 
-    const pending = pendingRegistrations.get(rawEmail);
-    if (!pending) {
+    let user = UserRegistry.findUser(rawEmail);
+    if (!user) {
+      try {
+        const [dbUsers] = await pool.query('SELECT * FROM users WHERE LOWER(email) = ?', [rawEmail]);
+        if (dbUsers.length > 0) user = dbUsers[0];
+      } catch (e) {}
+    }
+
+    if (!user) {
       return res.status(404).json({ 
         message: 'No pending registration found for this email. Please register again.' 
       });
     }
 
-    // Generate new OTP and reset expiration
     const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    pending.otp = newOtp;
-    pending.expiresAt = Date.now() + 10 * 60 * 1000;
-    pending.attempts = 0;
+    const expiresAtMs = Date.now() + 10 * 60 * 1000;
+    const expiresAtIso = new Date(expiresAtMs).toISOString();
 
-    await sendRegistrationOtp(pending.email, pending.name, newOtp);
+    UserRegistry.setOtp(rawEmail, newOtp, expiresAtIso);
 
-    console.log(`[AUTH:RESEND_OTP] New verification code dispatched to ${pending.email}`);
+    pendingRegistrations.set(rawEmail, {
+      name: user.name,
+      email: rawEmail,
+      otp: newOtp,
+      expiresAt: expiresAtMs,
+      attempts: 0
+    });
+
+    try {
+      await pool.query(
+        'UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE LOWER(email) = ?',
+        [newOtp, expiresAtIso, rawEmail]
+      );
+    } catch (e) {}
+
+    await sendRegistrationOtp(rawEmail, user.name, newOtp);
+
+    console.log(`[AUTH:RESEND_OTP] New verification code dispatched to ${rawEmail}`);
 
     res.json({
       success: true,
-      message: `A new 6-digit verification code has been sent to ${pending.email}.`
+      message: `A new 6-digit verification code has been sent to ${rawEmail}.`
     });
   } catch (error) {
     console.error('[AUTH:RESEND_OTP] Exception:', error.message);
