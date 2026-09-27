@@ -66,10 +66,17 @@ app.get('/', (req, res) => {
 });
 
 app.get(['/health', '/api/health'], (req, res) => {
+  const { getActiveEngine } = require('./config/database');
+  const engine = getActiveEngine();
   res.json({
     status: 'ok',
     message: 'EcoDonate API is operational',
     environment: process.env.VERCEL ? 'vercel-serverless' : 'standalone-node',
+    database_engine: engine,
+    storage_type: engine === 'mysql' ? 'persistent-cloud' : 'ephemeral-local',
+    notice: engine === 'mysql'
+      ? 'Connected to permanent remote cloud database. All user data, registrations and requests are stored permanently.'
+      : 'Running in local/ephemeral mode. Set DATABASE_URL in Vercel to store all registrations permanently in the cloud.',
     timestamp: new Date().toISOString()
   });
 });

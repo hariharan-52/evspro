@@ -26,23 +26,41 @@ git push origin main
 - **Output Directory**: `frontend/dist` *(auto-detected via `vercel.json`)*
 - **Install Command**: `npm install`
 
-### Step 4: Add Environment Variables (Optional / Recommended)
-Under **Environment Variables** in the Vercel project configuration, you can add:
+### Step 4: Configure Permanent Cloud Database (Crucial for Vercel Persistence)
 
-| Variable Name | Value | Purpose |
+> ⚠️ **Why is a Cloud Database Required on Vercel?**
+> Vercel runs on **stateless serverless microVMs**. Whenever a serverless container spins down (or after inactivity / browser refresh), any local in-memory files are recycled. 
+> To store **every user registration, donation, and recycling request PERMANENTLY all the time across every tab and browser**, connect a free cloud MySQL database.
+
+EcoDonate supports **1-Click Auto-Setup**: as soon as you connect your database, EcoDonate automatically builds all tables and seeds the demo data!
+
+#### Option A: TiDB Cloud Serverless (100% Free Forever, No Credit Card)
+1. Go to [tidbcloud.com](https://tidbcloud.com) and create a free account (or click **Storage ➜ Connect Store ➜ TiDB** in your Vercel project dashboard).
+2. Create a free **Serverless Cluster** (takes ~20 seconds).
+3. Click **Connect** ➜ Select **Connect with MySQL CLI / URL** and copy your connection string:
+   `mysql://<username>:<password>@<host>:4000/<database>?ssl={"rejectUnauthorized":true}`
+4. In your **Vercel Project Settings ➜ Environment Variables**, add:
+   - **`DATABASE_URL`**: paste your TiDB connection string.
+5. Redeploy! All users, donations, and requests are now stored permanently 24/7.
+
+#### Option B: Other Cloud MySQL (Aiven, Railway, PlanetScale)
+You can set either `DATABASE_URL` or individual variables:
+
+| Variable Name | Example / Value | Purpose |
 | :--- | :--- | :--- |
-| `JWT_SECRET` | *e.g. `your-super-secret-jwt-key-2026`* | Secret key for JWT signing (a secure default fallback is built-in) |
+| `DATABASE_URL` | `mysql://user:pass@host:3306/ecodonate` | Full MySQL connection string with SSL |
+| `DB_HOST` | `gateway.tidbcloud.com` or `mysql.railway.internal` | Remote MySQL host |
+| `DB_USER` | `root` or cluster username | Remote database user |
+| `DB_PASSWORD` | your database password | Remote database password |
+| `DB_NAME` | `ecodonate` | Remote database name |
+| `DB_PORT` | `4000` (TiDB) or `3306` (standard) | Database port |
+| `JWT_SECRET` | `your-super-secret-jwt-key-2026` | Secret key for JWT signing |
 | `JWT_EXPIRES_IN` | `7d` | Token expiry duration |
-| `DB_HOST` | *Optional (e.g. `aws.connect.psdb.cloud`)* | Remote MySQL host (PlanetScale / Aiven / TiDB / Supabase / Railway) |
-| `DB_USER` | *Optional MySQL user* | Remote MySQL database username |
-| `DB_PASSWORD` | *Optional MySQL password* | Remote MySQL database password |
-| `DB_NAME` | `ecodonate` | Remote MySQL database name |
-| `DB_PORT` | `3306` | Remote MySQL database port |
 
-> 💡 **Plug & Play Embedded DB**: If no MySQL database environment variables are configured, EcoDonate will automatically boot with its **embedded serverless SQLite database** containing pre-seeded users, donations, recycling requests, and demo accounts!
+---
 
 ### Step 5: Click Deploy
-Click **Deploy**. Vercel will build the React frontend and bundle the serverless `/api` routes in ~1 minute. Once finished, you will receive your live `https://ecodonate-xxx.vercel.app` URL.
+Click **Deploy** (or push to `main`). Vercel will build the React frontend and deploy the serverless `/api` backend. Once finished, you will receive your live URL.
 
 ---
 
