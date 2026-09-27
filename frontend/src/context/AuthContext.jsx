@@ -106,10 +106,14 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // 2. Registration Request (Step 1)
+  // 2. Direct Registration (Auto-authenticates active users so refresh preserves session)
   const registerRequest = useCallback(async (formData) => {
     try {
-      return await apiRegisterRequest(formData);
+      const res = await apiRegisterRequest(formData);
+      if (res && res.token && res.user && res.role === 'user') {
+        saveAuthSession(res.token, res.user);
+      }
+      return res;
     } catch (error) {
       throw error;
     }
@@ -205,6 +209,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         isAuthenticated,
         login,
+        saveAuthSession,
         register: registerRequest,
         registerRequest,
         verifyRegistrationOtp,

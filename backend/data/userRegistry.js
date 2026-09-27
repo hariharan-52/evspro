@@ -63,10 +63,9 @@ const UserRegistry = {
     const cleanId = String(identifier).trim().toLowerCase();
 
     return usersCache.find(u => {
-      if (String(u.id) === cleanId) return true;
       if (u.email && u.email.toLowerCase() === cleanId) return true;
       if (u.phone && u.phone.trim() === String(identifier).trim()) return true;
-      if (u.name && u.name.toLowerCase() === cleanId) return true;
+      if (String(u.id) === cleanId) return true;
       return false;
     }) || null;
   },
@@ -89,10 +88,9 @@ const UserRegistry = {
     const isEmailVerified = userData.is_email_verified !== undefined ? (userData.is_email_verified ? 1 : 0) : 1;
     const status = userData.status || (role === 'user' ? 'active' : 'pending');
 
-    // Check if user already exists
+    // Check if user already exists strictly by email
     let existingIndex = usersCache.findIndex(u => 
-      (email && u.email && u.email.toLowerCase() === email) ||
-      (phone && u.phone && u.phone === phone)
+      email && u.email && u.email.toLowerCase() === email
     );
 
     let passwordHash = userData.password_hash;
@@ -107,6 +105,7 @@ const UserRegistry = {
       // Update existing user record
       userObj = {
         ...usersCache[existingIndex],
+        id: userData.id || usersCache[existingIndex].id,
         name: name || usersCache[existingIndex].name,
         email: email || usersCache[existingIndex].email,
         phone: phone || usersCache[existingIndex].phone,
@@ -122,7 +121,6 @@ const UserRegistry = {
         otp_expires_at: userData.otp_expires_at !== undefined ? userData.otp_expires_at : usersCache[existingIndex].otp_expires_at,
         updated_at: new Date().toISOString()
       };
-      // Clean up legacy plain_password_hint
       delete userObj.plain_password_hint;
       if (userData.ngo_details) userObj.ngo_details = userData.ngo_details;
       if (userData.scrap_dealer_details) userObj.scrap_dealer_details = userData.scrap_dealer_details;
@@ -130,7 +128,7 @@ const UserRegistry = {
       usersCache[existingIndex] = userObj;
     } else {
       // Create new user record
-      const nextId = usersCache.reduce((max, u) => Math.max(max, Number(u.id) || 0), 0) + 1;
+      const nextId = userData.id ? Number(userData.id) : (usersCache.reduce((max, u) => Math.max(max, Number(u.id) || 0), 0) + 1);
       userObj = {
         id: nextId,
         name,
@@ -242,12 +240,13 @@ const UserRegistry = {
     loadRegistry();
 
     try {
+      // 1. Sync cache entries to SQL database
       for (const u of usersCache) {
         try {
           const [existing] = await pool.query('SELECT id FROM users WHERE LOWER(email) = ?', [u.email.toLowerCase()]);
           if (existing.length === 0) {
-            const [res] = await pool.query(
-              'INSERT INTO users (id, name, email, phone, password_hash, role, address, city, state, pincode, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            await pool.query(
+              'INSERT INTO users (id, name, email, phone, password_hash, role, address, city, state, pincode, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
               [u.id, u.name, u.email, u.phone || '', u.password_hash, u.role, u.address || '', u.city || '', u.state || '', u.pincode || '', u.status || 'active']
             );
             const dbUserId = u.id;
@@ -264,10 +263,40 @@ const UserRegistry = {
               );
             }
           }
-        } catch (queryErr) {
-          // Ignore individual duplicate key errors during sync
-        }
+        } catch (queryErr) {}
       }
+
+      // 2. Sync database entries into userRegistry cache
+      try {
+        const [allDbUsers] = await pool.query('SELECT * FROM users');
+        let cacheUpdated = false;
+        for (const dbUser of allDbUsers) {
+          const exists = usersCache.some(u => u.email && u.email.toLowerCase() === dbUser.email.toLowerCase());
+          if (!exists) {
+            usersCache.push({
+              id: dbUser.id,
+              name: dbUser.name,
+              email: dbUser.email,
+              phone: dbUser.phone || '',
+              password_hash: dbUser.password_hash,
+              role: dbUser.role || 'user',
+              address: dbUser.address || '',
+              city: dbUser.city || '',
+              state: dbUser.state || '',
+              pincode: dbUser.pincode || '',
+              status: dbUser.status || 'active',
+              is_email_verified: 1,
+              created_at: dbUser.created_at || new Date().toISOString(),
+              updated_at: dbUser.updated_at || new Date().toISOString()
+            });
+            cacheUpdated = true;
+          }
+        }
+        if (cacheUpdated) {
+          persistRegistry();
+        }
+      } catch (dbReadErr) {}
+
       console.log(`[UserRegistry] Synchronized ${usersCache.length} persistent accounts with database.`);
     } catch (err) {
       console.warn('[UserRegistry] Sync warning:', err.message);

@@ -61,8 +61,18 @@ const RegisterPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const { registerRequest } = useAuth();
+  const { registerRequest, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated (preserves user state on page refresh)
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'admin') navigate('/admin/dashboard', { replace: true });
+      else if (user.role === 'ngo') navigate('/ngo/dashboard', { replace: true });
+      else if (user.role === 'scrapdealer') navigate('/dealer/dashboard', { replace: true });
+      else navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleMaterialToggle = (material) => {
     setAcceptedMaterials((prev) =>
@@ -735,10 +745,10 @@ const RegisterPage = () => {
             <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 type="button"
-                onClick={() => navigate(`/login?email=${encodeURIComponent(email)}`)}
+                onClick={() => navigate('/dashboard')}
                 className="py-3 px-6 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
               >
-                <span>Sign In to Your Account</span>
+                <span>Go to Dashboard</span>
                 <ArrowRight size={16} />
               </button>
               <button

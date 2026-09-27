@@ -436,34 +436,45 @@ const login = async (req, res, next) => {
       return res.status(400).json({ message: 'Email address and password are required.' });
     }
 
-    // 1. Look up user in indestructible UserRegistry
-    let user = UserRegistry.findUser(rawEmail);
-
-    // 2. DB fallback
-    if (!user) {
-      try {
-        const [dbUsers] = await pool.query(
-          'SELECT * FROM users WHERE LOWER(email) = ? OR phone = ?',
-          [rawEmail, rawEmail]
-        );
-        if (dbUsers.length > 0) {
-          user = dbUsers[0];
-          UserRegistry.registerUser(user).catch(() => {});
-        }
-      } catch (dbErr) {
-        console.warn('[AUTH:LOGIN] DB fallback warning:', dbErr.message);
+    // 1. Look up user in SQL Database first
+    let user = null;
+    try {
+      const [dbUsers] = await pool.query(
+        'SELECT * FROM users WHERE LOWER(email) = ? OR phone = ?',
+        [rawEmail, rawEmail]
+      );
+      if (dbUsers && dbUsers.length > 0) {
+        user = dbUsers[0];
       }
+    } catch (dbErr) {
+      console.warn('[AUTH:LOGIN] DB query error:', dbErr.message);
+    }
+
+    // 2. UserRegistry lookup fallback
+    if (!user) {
+      user = UserRegistry.findUser(rawEmail);
     }
 
     if (!user) {
-      recordFailedAttempt(req);
       return res.status(401).json({ message: 'Invalid email address or password.' });
     }
 
     // 3. Verify password strictly using bcrypt
-    const match = await UserRegistry.verifyPassword(user, rawPassword);
+    let match = false;
+    if (user.password_hash) {
+      try {
+        match = await bcrypt.compare(rawPassword, user.password_hash);
+      } catch (e) {}
+    }
     if (!match) {
-      recordFailedAttempt(req);
+      const regUser = UserRegistry.findUser(rawEmail);
+      if (regUser) {
+        match = await UserRegistry.verifyPassword(regUser, rawPassword);
+        if (match) user = regUser;
+      }
+    }
+
+    if (!match) {
       return res.status(401).json({ message: 'Invalid email address or password.' });
     }
 
@@ -488,9 +499,6 @@ const login = async (req, res, next) => {
         code: 'ACCOUNT_INACTIVE'
       });
     }
-
-    // Clear failed attempts counter
-    clearFailedAttempts(req);
 
     // 6. Generate authenticated session token
     const tokenExpires = rememberMe ? '30d' : JWT_EXPIRES_IN;
