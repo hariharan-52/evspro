@@ -319,9 +319,6 @@ const RegisterPage = () => {
               <span className="font-medium">
                 Registering as: <strong className="text-gray-900 uppercase tracking-wide">{role === 'user' ? 'Individual User / Donor' : role === 'ngo' ? 'NGO / Organization' : 'Authorized Scrap Dealer'}</strong>
               </span>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
-                Verification Required
-              </span>
             </div>
 
             {/* Dynamic Form Sections */}
@@ -354,7 +351,7 @@ const RegisterPage = () => {
                 {/* Email Address */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Email Address (For OTP Verification) <span className="text-red-500">*</span>
+                    Email Address <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
