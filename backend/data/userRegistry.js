@@ -86,8 +86,8 @@ const UserRegistry = {
     const phone = (userData.phone || '').trim();
     const name = (userData.name || '').trim();
     const role = (userData.role || 'user').trim().toLowerCase();
-    const isEmailVerified = userData.is_email_verified !== undefined ? (userData.is_email_verified ? 1 : 0) : 0;
-    const status = userData.status || 'pending';
+    const isEmailVerified = userData.is_email_verified !== undefined ? (userData.is_email_verified ? 1 : 0) : 1;
+    const status = userData.status || (role === 'user' ? 'active' : 'pending');
 
     // Check if user already exists
     let existingIndex = usersCache.findIndex(u => 

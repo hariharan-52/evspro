@@ -205,6 +205,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         isAuthenticated,
         login,
+        register: registerRequest,
         registerRequest,
         verifyRegistrationOtp,
         resendRegistrationOtp,

@@ -34,6 +34,7 @@ const LoginPage = () => {
   const [forgotStep, setForgotStep] = useState('email'); // 'email' | 'otp' | 'new_password' | 'success'
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotDevOtp, setForgotDevOtp] = useState(null);
   const [forgotResetToken, setForgotResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -62,6 +63,17 @@ const LoginPage = () => {
       redirectToDashboard(user.role);
     }
   }, [isAuthenticated, user]);
+
+  // Pre-fill email from query param if redirected from registration
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(location.search);
+      const emailParam = searchParams.get('email');
+      if (emailParam) {
+        setEmail(emailParam.trim());
+      }
+    } catch (e) {}
+  }, [location.search]);
 
   // Forgot password cooldown timer
   useEffect(() => {
@@ -123,11 +135,11 @@ const LoginPage = () => {
       const msg = respData?.message || 'Login failed. Please check your credentials.';
 
       if (status === 403) {
-        if (respData?.code === 'ACCOUNT_PENDING' || msg.includes('awaiting Admin approval')) {
+        if (respData?.code === 'ACCOUNT_PENDING' || msg.includes('awaiting Admin approval') || msg.includes('review')) {
           setAccountStatusNotice({
             type: 'pending',
-            title: 'Your Account is Awaiting Admin Approval',
-            message: 'Your email has been verified, but our administrator must review and approve your account before you can log in. Please check back later.'
+            title: 'Account Awaiting Administrator Approval',
+            message: 'Your registration details have been securely recorded, but our platform administrator must review and approve your organization account before access is granted. Please check back soon.'
           });
         } else if (respData?.code === 'ACCOUNT_REJECTED' || msg.includes('rejected')) {
           setAccountStatusNotice({
@@ -135,11 +147,11 @@ const LoginPage = () => {
             title: 'Account Registration Rejected',
             message: 'Your registration was reviewed and rejected by the platform administrator. Access to protected features is restricted.'
           });
-        } else if (respData?.code === 'EMAIL_NOT_VERIFIED' || msg.includes('verify your email')) {
+        } else if (respData?.code === 'ACCOUNT_INACTIVE' || msg.includes('deactivated')) {
           setAccountStatusNotice({
-            type: 'unverified',
-            title: 'Email Address Not Verified',
-            message: 'Please verify your email address to complete your registration.'
+            type: 'rejected',
+            title: 'Account Deactivated',
+            message: 'This account has been deactivated by the administrator.'
           });
         } else {
           setLoginError(msg);
@@ -168,7 +180,8 @@ const LoginPage = () => {
     setForgotSubmitting(true);
     try {
       const res = await forgotPasswordSendOtp(cleanEmail);
-      toast.success(res.message || 'Password reset code sent to your email!');
+      toast.success(res.message || 'Password reset code sent!');
+      if (res?.dev_otp) setForgotDevOtp(res.dev_otp);
       setForgotStep('otp');
       setForgotCooldown(30);
       setForgotExpiresIn(600);
@@ -216,6 +229,7 @@ const LoginPage = () => {
     try {
       const res = await forgotPasswordSendOtp(forgotEmail.trim().toLowerCase());
       toast.success(res.message || 'New reset code sent!');
+      if (res?.dev_otp) setForgotDevOtp(res.dev_otp);
       setForgotCooldown(30);
       setForgotExpiresIn(600);
       setForgotOtp('');
@@ -312,7 +326,7 @@ const LoginPage = () => {
               ) : (
                 <Mail size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
               )}
-              <div>
+              <div className="flex-1">
                 <h4 className="font-bold text-xs uppercase tracking-wide mb-1">
                   {accountStatusNotice.title}
                 </h4>
@@ -537,6 +551,33 @@ const LoginPage = () => {
                     </p>
                     <p className="text-xs font-bold text-gray-900 mt-0.5">{forgotEmail}</p>
                   </div>
+
+                  {/* Dev Mode Code Helper */}
+                  {forgotDevOtp && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-left space-y-1.5 animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                          Dev / Demo Reset Code
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForgotOtp(forgotDevOtp);
+                            toast.success('Code copied!');
+                          }}
+                          className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-lg transition-all shadow-xs"
+                        >
+                          Auto-Fill
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-black tracking-[4px] text-emerald-950 bg-white border border-emerald-300 py-1 px-3 rounded-lg font-mono">
+                          {forgotDevOtp}
+                        </span>
+                        <span className="text-[10px] text-emerald-600">(Printed in terminal)</span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-center">
                     <input

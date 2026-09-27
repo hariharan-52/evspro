@@ -94,17 +94,31 @@ const sendRegistrationOtp = async (toEmail, name, otp) => {
       html: htmlContent
     });
 
-    console.log('================================================================');
-    console.log(`📧 [EMAIL SERVICE] Registration verification email dispatched to: ${toEmail}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Expires in: 10 Minutes`);
-    console.log('================================================================');
+    const hasSmtpConfig = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 
-    return { success: true, messageId: info.messageId };
+    console.log('\n================================================================');
+    console.log('🌱 [ECODONATE EMAIL SERVICE] REGISTRATION VERIFICATION CODE');
+    console.log('================================================================');
+    console.log(`👤 Recipient Email : ${toEmail}`);
+    console.log(`👤 Recipient Name  : ${name}`);
+    console.log(`🔑 VERIFICATION CODE: >>> [ ${otp} ] <<<`);
+    console.log(`⏱️  Code Expiry     : 10 Minutes`);
+    if (!hasSmtpConfig) {
+      console.log('⚠️  DELIVERY STATUS : In-Memory Stream Fallback (No SMTP configured)');
+      console.log(`💡 DEV TIP         : Enter code [ ${otp} ] on the registration screen.`);
+      console.log('                      To send real emails to your Gmail/inbox, add SMTP');
+      console.log('                      credentials to backend/.env (see backend/.env.example)');
+    } else {
+      console.log(`🚀 Delivery Route  : Outgoing SMTP (${process.env.SMTP_HOST})`);
+    }
+    console.log('================================================================\n');
+
+    return { success: true, messageId: info.messageId, otp };
   } catch (error) {
     console.error('[EmailService] Error sending registration OTP:', error.message);
     console.log(`📧 [EMAIL SERVICE] Fallback stream dispatch to ${toEmail}`);
-    return { success: true, fallback: true };
+    console.log(`🔑 FALLBACK VERIFICATION CODE: >>> [ ${otp} ] <<<`);
+    return { success: true, fallback: true, otp };
   }
 };
 
@@ -154,17 +168,29 @@ const sendPasswordResetOtp = async (toEmail, name, otp) => {
       html: htmlContent
     });
 
-    console.log('================================================================');
-    console.log(`📧 [EMAIL SERVICE] Password reset email dispatched to: ${toEmail}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Expires in: 10 Minutes`);
-    console.log('================================================================');
+    const hasSmtpConfig = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 
-    return { success: true, messageId: info.messageId };
+    console.log('\n================================================================');
+    console.log('🔐 [ECODONATE EMAIL SERVICE] PASSWORD RESET VERIFICATION CODE');
+    console.log('================================================================');
+    console.log(`👤 Recipient Email : ${toEmail}`);
+    console.log(`👤 Recipient Name  : ${name}`);
+    console.log(`🔑 RESET CODE       : >>> [ ${otp} ] <<<`);
+    console.log(`⏱️  Code Expiry     : 10 Minutes`);
+    if (!hasSmtpConfig) {
+      console.log('⚠️  DELIVERY STATUS : In-Memory Stream Fallback (No SMTP configured)');
+      console.log(`💡 DEV TIP         : Enter code [ ${otp} ] in the password reset modal.`);
+    } else {
+      console.log(`🚀 Delivery Route  : Outgoing SMTP (${process.env.SMTP_HOST})`);
+    }
+    console.log('================================================================\n');
+
+    return { success: true, messageId: info.messageId, otp };
   } catch (error) {
     console.error('[EmailService] Error sending password reset OTP:', error.message);
     console.log(`📧 [EMAIL SERVICE] Fallback stream dispatch to ${toEmail}`);
-    return { success: true, fallback: true };
+    console.log(`🔑 FALLBACK RESET CODE: >>> [ ${otp} ] <<<`);
+    return { success: true, fallback: true, otp };
   }
 };
 

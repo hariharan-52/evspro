@@ -26,7 +26,7 @@ import LiveLocationButton from '../../components/common/LiveLocationButton';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const RegisterPage = () => {
-  // Steps: 'form' | 'otp' | 'pending'
+  // Steps: 'form' | 'success' | 'pending'
   const [currentStep, setCurrentStep] = useState('form');
 
   // Role: 'user' | 'ngo' | 'scrapdealer' (ADMIN IS STRICTLY EXCLUDED)
@@ -57,41 +57,12 @@ const RegisterPage = () => {
   const [dealerRegNumber, setDealerRegNumber] = useState('');
   const [acceptedMaterials, setAcceptedMaterials] = useState(['Plastic', 'Paper', 'Metal']);
 
-  // OTP Verification State
-  const [otp, setOtp] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [otpExpiresIn, setOtpExpiresIn] = useState(600); // 10 minutes (600 seconds)
-
   // Loading & Error States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const { registerRequest, verifyRegistrationOtp, resendRegistrationOtp } = useAuth();
+  const { registerRequest } = useAuth();
   const navigate = useNavigate();
-
-  // Resend cooldown timer
-  useEffect(() => {
-    let interval = null;
-    if (resendCooldown > 0) {
-      interval = setInterval(() => setResendCooldown((prev) => prev - 1), 1000);
-    }
-    return () => clearInterval(interval);
-  }, [resendCooldown]);
-
-  // OTP expiration countdown timer
-  useEffect(() => {
-    let interval = null;
-    if (currentStep === 'otp' && otpExpiresIn > 0) {
-      interval = setInterval(() => setOtpExpiresIn((prev) => prev - 1), 1000);
-    }
-    return () => clearInterval(interval);
-  }, [currentStep, otpExpiresIn]);
-
-  const formatTimer = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const handleMaterialToggle = (material) => {
     setAcceptedMaterials((prev) =>
@@ -102,7 +73,7 @@ const RegisterPage = () => {
   };
 
   // ============================================================================
-  // Step 1: Handle Registration Form Submit -> Request Email OTP
+  // Direct Registration Form Submit
   // ============================================================================
   const handleSubmitForm = async (e) => {
     e.preventDefault();
@@ -205,65 +176,15 @@ const RegisterPage = () => {
       }
 
       const res = await registerRequest(payload);
-      toast.success(res.message || 'Verification code sent to your email!');
-      setCurrentStep('otp');
-      setResendCooldown(30);
-      setOtpExpiresIn(600); // 10 minutes
+      toast.success(res.message || 'Account registered successfully!');
+
+      if (role === 'user') {
+        setCurrentStep('success');
+      } else {
+        setCurrentStep('pending');
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to submit registration. Please try again.';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // ============================================================================
-  // Step 2: Handle Verify Registration Email OTP
-  // ============================================================================
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    const cleanOtp = otp.trim();
-    if (!cleanOtp) {
-      setError('Please enter the 6-digit verification code.');
-      return;
-    }
-    if (cleanOtp.length !== 6) {
-      setError('Verification code must be 6 digits.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const res = await verifyRegistrationOtp(email.trim().toLowerCase(), cleanOtp);
-      toast.success(res.message || 'Email verified successfully!');
-      setCurrentStep('pending');
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid or expired verification code.';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // ============================================================================
-  // Step 2 (Optional): Resend Email OTP
-  // ============================================================================
-  const handleResendOtp = async () => {
-    if (resendCooldown > 0 || isSubmitting) return;
-    setError('');
-    setIsSubmitting(true);
-    try {
-      const res = await resendRegistrationOtp(email.trim().toLowerCase());
-      toast.success(res.message || 'New verification code sent to your email!');
-      setResendCooldown(30);
-      setOtpExpiresIn(600);
-      setOtp('');
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to resend code. Please try again.';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -742,16 +663,16 @@ const RegisterPage = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent rounded-2xl shadow-sm text-sm font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 border border-transparent rounded-2xl shadow-sm text-sm font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all disabled:opacity-50 active:scale-[0.99]"
               >
                 {isSubmitting ? (
                   <>
                     <LoadingSpinner size="small" color="white" />
-                    <span>Sending Email Verification Code...</span>
+                    <span>Creating Your Account...</span>
                   </>
                 ) : (
                   <>
-                    <span>Continue to Email Verification</span>
+                    <span>Create Account</span>
                     <ArrowRight size={17} />
                   </>
                 )}
@@ -771,98 +692,68 @@ const RegisterPage = () => {
         )}
 
         {/* ===================================================================== */}
-        {/* SCREEN 2: EMAIL OTP VERIFICATION */}
+        {/* SCREEN 2: REGISTRATION SUCCESS (Individual Users / Donors) */}
         {/* ===================================================================== */}
-        {currentStep === 'otp' && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="text-center">
-              <div className="inline-flex p-3 bg-blue-50 rounded-2xl border border-blue-200 mb-3 text-blue-600">
-                <Mail size={32} />
+        {currentStep === 'success' && (
+          <div className="space-y-6 text-center animate-fadeIn py-4">
+            <div className="inline-flex p-4 bg-emerald-50 rounded-3xl border border-emerald-200 text-emerald-600 shadow-xs">
+              <CheckCircle2 size={52} className="text-emerald-600" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                Account Created & Active
               </div>
-              <h2 className="text-xl font-bold text-gray-900">Verify Your Email Address</h2>
-              <p className="mt-1 text-xs text-gray-500">
-                We've sent a 6-digit one-time code to:
-              </p>
-              <p className="mt-1 text-sm font-bold text-gray-800 bg-gray-100 py-1 px-3 rounded-lg inline-block font-mono">
-                {email}
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                Welcome to EcoDonate!
+              </h2>
+              <p className="text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
+                Thank you, <strong>{name}</strong>! Your account (<strong>{email}</strong>) has been successfully created and saved in the database.
               </p>
             </div>
 
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 text-center mb-2">
-                  Enter 6-Digit Verification Code
-                </label>
-                <div className="flex justify-center">
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    autoFocus
-                    placeholder="••••••"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-56 text-center text-2xl font-bold tracking-[8px] py-3 px-4 border border-gray-300 rounded-2xl shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white font-mono"
-                  />
-                </div>
-              </div>
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-left space-y-2.5 text-xs text-gray-600">
+              <p className="font-bold text-gray-800 uppercase tracking-wider text-[11px]">
+                Your account is ready to use:
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Donate clothes, books, and household goods to trusted NGOs</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Schedule doorstep recycling pickups with verified scrap dealers</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Earn EcoPoints and track your environmental contribution</span>
+                </li>
+              </ul>
+            </div>
 
-              {/* Countdown & Resend */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs bg-gray-50 p-3.5 rounded-2xl border border-gray-200/80">
-                <div className="flex items-center gap-1.5 text-gray-500">
-                  <Clock size={15} className="text-amber-500" />
-                  <span>
-                    Code expires in: <strong className="text-gray-800 font-mono">{formatTimer(otpExpiresIn)}</strong>
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={resendCooldown > 0 || isSubmitting}
-                  onClick={handleResendOtp}
-                  className="font-bold text-green-600 hover:text-green-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
-                >
-                  <RefreshCw size={13} className={isSubmitting ? 'animate-spin' : ''} />
-                  <span>{resendCooldown > 0 ? `Resend Code in ${resendCooldown}s` : 'Resend Code'}</span>
-                </button>
-              </div>
-
-              {/* Verification Button */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
               <button
-                type="submit"
-                disabled={isSubmitting || otp.length !== 6}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent rounded-2xl shadow-sm text-sm font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all disabled:opacity-50"
+                type="button"
+                onClick={() => navigate(`/login?email=${encodeURIComponent(email)}`)}
+                className="py-3 px-6 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
               >
-                {isSubmitting ? (
-                  <>
-                    <LoadingSpinner size="small" color="white" />
-                    <span>Verifying Code...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck size={18} />
-                    <span>Verify Email & Complete Registration</span>
-                  </>
-                )}
+                <span>Sign In to Your Account</span>
+                <ArrowRight size={16} />
               </button>
-
-              {/* Back to Edit Button */}
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setCurrentStep('form'); setError(''); }}
-                  className="text-xs font-semibold text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1 mx-auto"
-                >
-                  <ArrowLeft size={14} />
-                  <span>Change email address or edit details</span>
-                </button>
-              </div>
-            </form>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="py-3 px-6 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-2xl font-semibold text-sm transition-all"
+              >
+                Return to Home
+              </button>
+            </div>
           </div>
         )}
 
         {/* ===================================================================== */}
-        {/* SCREEN 3: PENDING ADMIN APPROVAL STATE */}
+        {/* SCREEN 3: PENDING ADMIN APPROVAL STATE (NGO & Scrap Dealers) */}
         {/* ===================================================================== */}
         {currentStep === 'pending' && (
           <div className="space-y-6 text-center animate-fadeIn py-4">
@@ -878,7 +769,7 @@ const RegisterPage = () => {
                 Registration Submitted Successfully!
               </h2>
               <p className="text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
-                Thank you, <strong>{name}</strong>! Your email address (<strong>{email}</strong>) has been verified.
+                Thank you, <strong>{name}</strong>! Your registration details for <strong>{email}</strong> have been recorded in the database.
               </p>
             </div>
 
@@ -889,15 +780,15 @@ const RegisterPage = () => {
               <ul className="text-xs text-gray-600 space-y-2">
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center text-[10px]">1</span>
-                  <span>Our platform administrator will review your <strong>{role.toUpperCase()}</strong> registration details and credentials.</span>
+                  <span>Our platform administrator will review your <strong>{role.toUpperCase()}</strong> registration details and license credentials.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center text-[10px]">2</span>
-                  <span>Upon successful review, your account status will transition from <strong className="text-amber-700">PENDING</strong> to <strong className="text-green-700">APPROVED</strong>.</span>
+                  <span>Once verified, your account status will transition to <strong className="text-green-700">APPROVED</strong>.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center text-[10px]">3</span>
-                  <span>Once approved, you can sign in directly using your email and password to access all protected platform features.</span>
+                  <span>You can then log in with your email and password to access the organization dashboard.</span>
                 </li>
               </ul>
             </div>
@@ -905,7 +796,7 @@ const RegisterPage = () => {
             <div className="pt-3 flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 type="button"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(`/login?email=${encodeURIComponent(email)}`)}
                 className="py-3 px-6 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
               >
                 <span>Continue to Sign In Page</span>
