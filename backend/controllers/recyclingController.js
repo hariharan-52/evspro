@@ -58,24 +58,30 @@ const createRecycling = async (req, res, next) => {
       console.warn('Could not send notification:', notifErr.message);
     }
 
-    // Asynchronously backup recycling request permanently in Google Cloud Firestore
-    saveRecyclingToFirestore({
-      request_id,
-      user_id: req.user.id,
-      user_email: req.user.email || null,
-      user_name: req.user.name || null,
-      waste_category,
-      description,
-      quantity,
-      quantity_unit,
-      address,
-      city,
-      pincode,
-      pickup_date,
-      ai_prediction,
-      ai_confidence,
-      status: 'PENDING'
-    }).catch(() => {});
+    // Backup recycling request permanently in Google Cloud Firestore (Awaited to ensure persistence)
+    try {
+      await saveRecyclingToFirestore({
+        id: result.insertId,
+        request_id,
+        user_id: req.user.id,
+        user_email: req.user.email || null,
+        user_name: req.user.name || null,
+        waste_category,
+        description,
+        quantity,
+        quantity_unit,
+        image,
+        address,
+        city,
+        pincode,
+        pickup_date,
+        ai_prediction,
+        ai_confidence,
+        status: 'PENDING'
+      });
+    } catch (fsErr) {
+      console.warn('Firestore recycling save note:', fsErr.message);
+    }
 
     res.status(201).json({ message: 'Request created successfully', id: result.insertId, request_id });
   } catch (error) {
@@ -97,7 +103,6 @@ const getRecyclingRequests = async (req, res, next) => {
       const dealerId = sd && sd.length > 0 ? sd[0].id : -1;
       
       if (history === 'true' || history === '1') {
-        // Only return collected / completed recycling requests for this dealer
         query += ' AND r.scrap_dealer_id = ? AND (r.status = "COLLECTED" OR r.status = "COMPLETED")';
         params.push(dealerId);
       } else {
@@ -116,7 +121,35 @@ const getRecyclingRequests = async (req, res, next) => {
     }
 
     query += ' ORDER BY r.created_at DESC';
-    const [requests] = await pool.query(query, params);
+    let [requests] = await pool.query(query, params);
+
+    // If no recycling requests found for this user, check Cloud Firestore for persistent records
+    if (requests.length === 0 && req.user.role === 'user') {
+      try {
+        const { getAllRecyclingFromFirestore } = require('../services/firestoreService');
+        const cloudRecycling = await getAllRecyclingFromFirestore();
+        const userCloudRecycling = cloudRecycling.filter(r => 
+          (r.user_email && req.user.email && r.user_email.toLowerCase() === req.user.email.toLowerCase()) ||
+          r.user_id == req.user.id
+        );
+
+        for (const cr of userCloudRecycling) {
+          const [exists] = await pool.query('SELECT id FROM recycling_requests WHERE request_id = ?', [cr.request_id]);
+          if (exists.length === 0) {
+            await pool.query(
+              `INSERT INTO recycling_requests (request_id, user_id, scrap_dealer_id, waste_category, description, quantity, quantity_unit, image, address, city, pincode, pickup_date, ai_prediction, ai_confidence, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [cr.request_id, req.user.id, cr.scrap_dealer_id || null, cr.waste_category || 'Plastic', cr.description || '', cr.quantity || 1, cr.quantity_unit || 'kg', cr.image || null, cr.address || '', cr.city || '', cr.pincode || '', cr.pickup_date || null, cr.ai_prediction || null, cr.ai_confidence || null, cr.status || 'PENDING']
+            ).catch(() => {});
+          }
+        }
+
+        if (userCloudRecycling.length > 0) {
+          [requests] = await pool.query(query, params);
+        }
+      } catch (fsSyncErr) {}
+    }
+
     res.json(requests);
   } catch (error) {
     next(error);
@@ -216,6 +249,15 @@ const updateRecyclingStatus = async (req, res, next) => {
         );
       }
     }
+    // Update in Cloud Firestore
+    try {
+      const { updateRecyclingInFirestore } = require('../services/firestoreService');
+      await updateRecyclingInFirestore(request[0].request_id, {
+        status: normalizedStatus,
+        scrap_dealer_id: updateQuery.includes('scrap_dealer_id') ? dealerId : request[0].scrap_dealer_id
+      });
+    } catch (fsErr) {}
+
     res.json({ message: `Recycling job marked as ${normalizedStatus} successfully`, status: normalizedStatus });
   } catch (error) {
     next(error);

@@ -30,9 +30,10 @@ async function firebaseSignUp(email, password, profileData = {}) {
       return null;
     }
 
-    // Persist full profile JSON into Firebase Cloud
-    if (data.idToken && profileData) {
-      await updateFirebaseProfile(data.idToken, profileData);
+    // Persist safe display name into Firebase Cloud Auth (strictly under 100 chars to avoid 256 char limit)
+    if (data.idToken) {
+      const safeName = String(profileData.name || cleanEmail.split('@')[0]).slice(0, 100);
+      await updateFirebaseProfile(data.idToken, safeName);
     }
 
     console.log(`[FirebaseAuth] ✅ User permanently registered in Firebase Cloud Auth: ${cleanEmail} (UID: ${data.localId})`);
@@ -44,7 +45,7 @@ async function firebaseSignUp(email, password, profileData = {}) {
 }
 
 /**
- * Sign in user and retrieve their permanently stored cloud profile
+ * Sign in user and retrieve their permanently stored cloud profile from Firestore
  */
 async function firebaseSignIn(email, password) {
   try {
@@ -66,42 +67,35 @@ async function firebaseSignIn(email, password) {
       return null;
     }
 
-    // Lookup profile data stored in Firebase Auth
-    const lookupUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`;
-    const lookupRes = await fetch(lookupUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: data.idToken })
-    });
-    const lookupData = await lookupRes.json();
-    const userRecord = lookupData.users?.[0];
+    // Look up persistent profile data in Cloud Firestore first for complete fidelity
+    const { getUserFromFirestore } = require('./firestoreService');
+    const firestoreUser = await getUserFromFirestore(cleanEmail);
 
-    let profile = {};
-    if (userRecord?.displayName) {
-      try {
-        profile = JSON.parse(userRecord.displayName);
-      } catch (e) {
-        profile = { name: userRecord.displayName };
+    let displayName = cleanEmail.split('@')[0];
+    try {
+      const lookupUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`;
+      const lookupRes = await fetch(lookupUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: data.idToken })
+      });
+      const lookupData = await lookupRes.json();
+      if (lookupData.users?.[0]?.displayName) {
+        displayName = lookupData.users[0].displayName;
       }
-    }
+    } catch (lookupErr) {}
 
     console.log(`[FirebaseAuth] ✅ Firebase Cloud Auth login successful for: ${cleanEmail}`);
     return {
       authData: data,
-      userRecord,
-      profile: {
-        name: profile.name || userRecord?.displayName || cleanEmail.split('@')[0],
+      uid: data.localId,
+      email: cleanEmail,
+      profile: firestoreUser || {
+        name: displayName,
         email: cleanEmail,
-        role: profile.role || 'user',
-        phone: profile.phone || '',
-        address: profile.address || '',
-        city: profile.city || '',
-        state: profile.state || '',
-        pincode: profile.pincode || '',
-        status: profile.status || 'active',
-        is_email_verified: 1,
-        ngo_details: profile.ngo_details || null,
-        scrap_dealer_details: profile.scrap_dealer_details || null
+        role: 'user',
+        status: 'active',
+        is_email_verified: 1
       }
     };
   } catch (err) {
@@ -111,17 +105,18 @@ async function firebaseSignIn(email, password) {
 }
 
 /**
- * Helper to update Firebase Cloud profile metadata
+ * Helper to update Firebase Cloud Auth display name
  */
-async function updateFirebaseProfile(idToken, profileData) {
+async function updateFirebaseProfile(idToken, displayName) {
   try {
+    const safeName = String(displayName || '').slice(0, 100);
     const updateUrl = `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${FIREBASE_API_KEY}`;
     await fetch(updateUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         idToken,
-        displayName: JSON.stringify(profileData),
+        displayName: safeName,
         returnSecureToken: false
       })
     });
@@ -134,7 +129,8 @@ async function firebaseSignInAndUpdate(email, password, profileData) {
   try {
     const signInRes = await firebaseSignIn(email, password);
     if (signInRes && signInRes.authData?.idToken) {
-      await updateFirebaseProfile(signInRes.authData.idToken, profileData);
+      const safeName = String(profileData.name || email.split('@')[0]).slice(0, 100);
+      await updateFirebaseProfile(signInRes.authData.idToken, safeName);
       return signInRes.authData;
     }
   } catch (e) {}

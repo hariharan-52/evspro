@@ -11,7 +11,8 @@
     "state": "Delhi",
     "pincode": "110001",
     "status": "active",
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:20.840Z"
   },
   {
     "id": 2,
@@ -25,7 +26,8 @@
     "state": "Maharashtra",
     "pincode": "400001",
     "status": "active",
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:21.370Z"
   },
   {
     "id": 3,
@@ -39,7 +41,8 @@
     "state": "Tamil Nadu",
     "pincode": "600001",
     "status": "active",
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:21.237Z"
   },
   {
     "id": 4,
@@ -54,13 +57,14 @@
     "pincode": "400050",
     "status": "active",
     "ngo_details": {
-      "ngo_name": "Green Earth NGO",
       "contact_person": "Suresh Patel",
-      "registration_number": "REG123456",
       "description": "Dedicated to environmental conservation and helping the needy.",
-      "verification_status": "approved"
+      "verification_status": "approved",
+      "ngo_name": "Green Earth NGO",
+      "registration_number": "REG123456"
     },
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:20.853Z"
   },
   {
     "id": 5,
@@ -75,13 +79,14 @@
     "pincode": "600004",
     "status": "active",
     "ngo_details": {
-      "ngo_name": "Hari NGO Foundation",
-      "contact_person": "Hariharan",
+      "verification_status": "approved",
       "registration_number": "REG789101",
-      "description": "Empowering communities through sustainable donations and aid.",
-      "verification_status": "approved"
+      "contact_person": "Hariharan",
+      "ngo_name": "Hari NGO Foundation",
+      "description": "Empowering communities through sustainable donations and aid."
     },
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:21.248Z"
   },
   {
     "id": 6,
@@ -96,13 +101,14 @@
     "pincode": "400093",
     "status": "active",
     "scrap_dealer_details": {
+      "accepted_materials": "[\"Plastic\",\"Paper\",\"Metal\",\"E-Waste\"]",
       "business_name": "Eco Scrap Traders",
       "contact_person": "Ramesh Gupta",
       "registration_number": "SCRAP987",
-      "accepted_materials": "[\"Plastic\",\"Paper\",\"Metal\",\"E-Waste\"]",
       "verification_status": "approved"
     },
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:21.266Z"
   },
   {
     "id": 7,
@@ -118,12 +124,13 @@
     "status": "active",
     "scrap_dealer_details": {
       "business_name": "Hari Scrap Dealers",
-      "contact_person": "Hariharan Scrap",
-      "registration_number": "SCRAP555",
+      "verification_status": "approved",
       "accepted_materials": "[\"Plastic\",\"Paper\",\"Metal\",\"E-Waste\",\"Glass\"]",
-      "verification_status": "approved"
+      "registration_number": "SCRAP555",
+      "contact_person": "Hariharan Scrap"
     },
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:21.258Z"
   },
   {
     "id": 8,
@@ -141,10 +148,11 @@
       "ngo_name": "Hope Foundation",
       "contact_person": "Meera Reddy",
       "registration_number": "REG654321",
-      "description": "Providing education and resources to underprivileged children.",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "description": "Providing education and resources to underprivileged children."
     },
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:21.328Z"
   },
   {
     "id": 9,
@@ -159,13 +167,14 @@
     "pincode": "560022",
     "status": "active",
     "scrap_dealer_details": {
-      "business_name": "City Recyclers",
-      "contact_person": "Vinod Desai",
-      "registration_number": "SCRAP123",
+      "verification_status": "pending",
       "accepted_materials": "[\"Paper\",\"Cardboard\",\"Glass\"]",
-      "verification_status": "pending"
+      "registration_number": "SCRAP123",
+      "contact_person": "Vinod Desai",
+      "business_name": "City Recyclers"
     },
-    "is_email_verified": 1
+    "is_email_verified": 1,
+    "updated_at": "2026-10-12T15:22:21.338Z"
   },
   {
     "id": 10,
@@ -180,7 +189,7 @@
     "pincode": "",
     "status": "active",
     "created_at": "2026-09-25T14:00:32.301Z",
-    "updated_at": "2026-09-25T14:00:32.302Z",
+    "updated_at": "2026-10-12T15:22:21.141Z",
     "is_email_verified": 1
   },
   {
@@ -196,7 +205,7 @@
     "pincode": "600001",
     "status": "active",
     "created_at": "2026-09-25T14:00:32.744Z",
-    "updated_at": "2026-09-25T14:45:51.713Z",
+    "updated_at": "2026-10-12T15:22:21.284Z",
     "is_email_verified": 1
   },
   {
@@ -212,7 +221,7 @@
     "pincode": "",
     "status": "active",
     "created_at": "2026-09-25T14:45:51.119Z",
-    "updated_at": "2026-09-25T14:45:51.119Z",
+    "updated_at": "2026-10-12T15:22:21.150Z",
     "is_email_verified": 1
   },
   {
@@ -229,7 +238,7 @@
     "is_email_verified": 1,
     "status": "active",
     "created_at": "2026-09-25T15:15:31.726Z",
-    "updated_at": "2026-09-25T15:28:09.804Z"
+    "updated_at": "2026-10-12T15:22:21.364Z"
   },
   {
     "id": 11,
@@ -245,7 +254,7 @@
     "status": "active",
     "is_email_verified": 1,
     "created_at": "2026-09-25 14:00:32",
-    "updated_at": "2026-09-25 14:00:32"
+    "updated_at": "2026-10-12T15:22:21.274Z"
   },
   {
     "id": 13,
@@ -261,7 +270,7 @@
     "status": "active",
     "is_email_verified": 1,
     "created_at": "2026-09-25 15:26:49",
-    "updated_at": "2026-09-25 15:26:49"
+    "updated_at": "2026-10-12T15:22:21.355Z"
   },
   {
     "id": 14,
@@ -279,6 +288,146 @@
     "otp_code": null,
     "otp_expires_at": null,
     "created_at": "2026-09-27T09:06:12.296Z",
-    "updated_at": "2026-09-27T09:06:12.315Z"
+    "updated_at": "2026-10-12T15:22:21.375Z"
+  },
+  {
+    "id": 20,
+    "name": "Persistent Tester",
+    "email": "persistent_user_1791801887462@ecodonate.org",
+    "phone": "9876543210",
+    "password_hash": "$2b$10$sNPLxiK6WFAlFPNKpSMyHe7nj/EzNG0eml0AdMcSHzfd9vN8qr7V.",
+    "role": "user",
+    "address": "100 Eco Green St",
+    "city": "Bangalore",
+    "state": "Karnataka",
+    "pincode": "560001",
+    "status": "active",
+    "is_email_verified": 1,
+    "created_at": "2026-10-12 10:44:48",
+    "updated_at": "2026-10-12T15:22:21.348Z"
+  },
+  {
+    "id": 21,
+    "name": "Test User",
+    "email": "testprofile123@ecodonate.org",
+    "phone": "9876543210",
+    "password_hash": "$2b$10$omLNf5BHJfuYpx8TtUtbPOgnRWbiGoYjhXHov6QImK3aWZvhtxUJu",
+    "role": "user",
+    "address": "",
+    "city": "",
+    "state": "",
+    "pincode": "",
+    "status": "active",
+    "is_email_verified": 1,
+    "created_at": "2026-10-12 10:45:28",
+    "updated_at": "2026-10-12T15:22:21.504Z"
+  },
+  {
+    "id": 22,
+    "name": "Registration Tester",
+    "email": "regtest_1791816430828@example.com",
+    "phone": "9876543210",
+    "password_hash": "$2b$10$PG0Ru4l0WPruJohNz7qCUOx72E4phndlySv0I.3EGBFVZZx19o0g2",
+    "role": "user",
+    "address": "123 Green Street",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "pincode": "400001",
+    "is_email_verified": 1,
+    "status": "active",
+    "otp_code": null,
+    "otp_expires_at": null,
+    "created_at": "2026-10-12T14:48:50.110Z",
+    "updated_at": "2026-10-12T15:22:21.381Z"
+  },
+  {
+    "id": 23,
+    "name": "ngotest_1791816600944",
+    "email": "ngotest_1791816600944@example.com",
+    "phone": "",
+    "password_hash": "$2b$10$uh574rkg9BnF70Ghiv4rb.fYMuaBK/tLEX.dttRhvcC.bFCujjGjC",
+    "role": "user",
+    "address": "",
+    "city": "",
+    "state": "",
+    "pincode": "",
+    "is_email_verified": 1,
+    "status": "active",
+    "otp_code": null,
+    "otp_expires_at": null,
+    "created_at": "2026-10-12T14:50:03.863Z",
+    "updated_at": "2026-10-12T15:22:21.314Z"
+  },
+  {
+    "id": 999,
+    "name": "Eco Green Tester",
+    "email": "ecotester_firestore@ecodonate.org",
+    "phone": "9876543210",
+    "password_hash": "$2b$10$DDTjZgFqqyKrSHreQxqD2u1SRyX9FM7VoS84aCg6n1iw.0fzZeqg.",
+    "role": "user",
+    "address": "",
+    "city": "Chennai",
+    "state": "",
+    "pincode": "",
+    "is_email_verified": 0,
+    "status": "active",
+    "otp_code": null,
+    "otp_expires_at": null,
+    "created_at": "2026-10-12T15:22:21.113Z",
+    "updated_at": "2026-10-12T15:22:21.113Z"
+  },
+  {
+    "id": 1000,
+    "name": "Hariharan",
+    "email": "hariharan.cse27@gmail.com",
+    "phone": "9876543220",
+    "password_hash": "$2b$10$NpFVN5w0PCFhzdvfCYpZgOY60HmgabXFzxJPsHk6oBA5DxlgL6ige",
+    "role": "user",
+    "address": "Kajamalai",
+    "city": "Tiruchirappalli",
+    "state": "Tamil Nadu",
+    "pincode": "620021",
+    "is_email_verified": 1,
+    "status": "active",
+    "otp_code": null,
+    "otp_expires_at": null,
+    "created_at": "2026-10-12T15:22:21.193Z",
+    "updated_at": "2026-10-12T15:22:21.193Z"
+  },
+  {
+    "id": 1001,
+    "name": "Firestore Tester",
+    "email": "test_1791814273406@example.com",
+    "phone": "",
+    "password_hash": "$2b$10$DVscH4Nar4HO934zM.LxI.L9sE6fpTGEMDPM4vIBijpwdA7HirE8m",
+    "role": "user",
+    "address": "",
+    "city": "",
+    "state": "",
+    "pincode": "",
+    "is_email_verified": 0,
+    "status": "active",
+    "otp_code": null,
+    "otp_expires_at": null,
+    "created_at": "2026-10-12T15:22:21.495Z",
+    "updated_at": "2026-10-12T15:22:21.495Z"
+  },
+  {
+    "id": 1002,
+    "name": "E2E Test User",
+    "email": "e2e_user_1791818538202@ecodonate.test",
+    "phone": "9876500011",
+    "password_hash": "$2b$10$HRn45zkA90Qm976BnNP3ZOfs1xb9ECH2iuGqNHnUhf31BI04gOmw6",
+    "role": "user",
+    "address": "42 Eco Horizon Street",
+    "city": "Coimbatore",
+    "state": "Tamil Nadu",
+    "pincode": "641001",
+    "is_email_verified": 1,
+    "status": "active",
+    "otp_code": null,
+    "otp_expires_at": null,
+    "created_at": "2026-10-12T15:22:29.354Z",
+    "updated_at": "2026-10-12T15:22:29.354Z"
   }
 ]

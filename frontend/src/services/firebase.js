@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
@@ -29,6 +29,13 @@ try {
     googleProvider = new GoogleAuthProvider();
     db = getFirestore(app);
     storage = getStorage(app);
+
+    // Guarantee permanent browser local persistence for client-side authentication
+    if (auth && typeof window !== 'undefined') {
+      setPersistence(auth, browserLocalPersistence).catch((err) => {
+        console.warn('[Firebase] Auth persistence notice:', err.message);
+      });
+    }
 
     if (typeof window !== 'undefined') {
       isSupported().then((supported) => {

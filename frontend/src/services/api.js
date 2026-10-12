@@ -53,11 +53,14 @@ api.interceptors.response.use(
       !isAuthRoute &&
       !isBackgroundRoute
     ) {
-      // Only redirect if user was previously authenticated (had a token)
+      // Only redirect if user has no cached session that can be self-healed
       const hadToken = !!localStorage.getItem('token');
-      localStorage.removeItem('token');
-      if (hadToken && typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-        window.location.href = '/login';
+      const hasCachedUser = !!localStorage.getItem('ecodonate_user');
+      if (hadToken && !hasCachedUser) {
+        localStorage.removeItem('token');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

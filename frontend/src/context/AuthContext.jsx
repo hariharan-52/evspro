@@ -13,7 +13,7 @@ import {
   syncSession
 } from '../services/auth';
 import { auth, googleProvider } from '../services/firebase';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 
 export const AuthContext = createContext(null);
@@ -87,8 +87,8 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        // If explicitly revoked / blocked, clear session; otherwise keep cached session
-        if (status === 401 || status === 403) {
+        // Only clear session if explicitly revoked/blocked (403), or 401 with no cached data
+        if (status === 403 || (status === 401 && !cachedUserData)) {
           if (!cancelled) {
             localStorage.removeItem('token');
             localStorage.removeItem('ecodonate_user');
@@ -123,6 +123,14 @@ export const AuthProvider = ({ children }) => {
       authInProgressRef.current = true;
       const data = await apiLogin(email, password, rememberMe);
       saveAuthSession(data.token, data.user);
+
+      // Also sign in to client Firebase Auth if initialized
+      try {
+        if (auth && password) {
+          await signInWithEmailAndPassword(auth, email, password);
+        }
+      } catch (fbClientErr) {}
+
       toast.success(data.message || 'Login successful!');
       return data;
     } catch (error) {
@@ -171,6 +179,13 @@ export const AuthProvider = ({ children }) => {
       const res = await apiRegisterRequest(formData);
       if (res && res.token && res.user) {
         saveAuthSession(res.token, res.user);
+
+        // Also sign in to client-side Firebase Auth if password available
+        try {
+          if (auth && formData.password) {
+            await signInWithEmailAndPassword(auth, formData.email, formData.password);
+          }
+        } catch (fbClientErr) {}
       }
       return res;
     } catch (error) {
@@ -228,6 +243,11 @@ export const AuthProvider = ({ children }) => {
     try {
       await apiLogout();
     } finally {
+      try {
+        if (auth) {
+          await signOut(auth);
+        }
+      } catch (fbOutErr) {}
       localStorage.removeItem('token');
       localStorage.removeItem('ecodonate_user');
       setToken(null);

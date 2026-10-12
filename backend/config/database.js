@@ -627,6 +627,14 @@ const testConnection = async () => {
   } catch (syncErr) {
     console.warn('UserRegistry sync note:', syncErr.message);
   }
+
+  // Hydrate all permanent user accounts, donations & recycling from Cloud Firestore
+  try {
+    const { syncAllFromFirestore } = require('../services/firestoreService');
+    await syncAllFromFirestore(pool);
+  } catch (fsSyncErr) {
+    console.warn('Cloud Firestore initialization sync note:', fsSyncErr.message);
+  }
 };
 
 const pool = {

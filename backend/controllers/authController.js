@@ -129,12 +129,18 @@ const registerRequest = async (req, res, next) => {
       };
     }
 
-    // 3. Check if email is already registered in DB or UserRegistry
+    // 3. Check if email is already registered in DB, UserRegistry, or Cloud Firestore
     let existingUser = UserRegistry.findUser(rawEmail);
     if (!existingUser) {
       try {
         const [dbUsers] = await pool.query('SELECT id FROM users WHERE LOWER(email) = ?', [rawEmail]);
         if (dbUsers.length > 0) existingUser = dbUsers[0];
+      } catch (e) {}
+    }
+    if (!existingUser) {
+      try {
+        const firestoreUser = await getUserFromFirestore(rawEmail);
+        if (firestoreUser) existingUser = firestoreUser;
       } catch (e) {}
     }
     if (existingUser) {
@@ -146,7 +152,6 @@ const registerRequest = async (req, res, next) => {
     // 4. Securely hash password
     const passwordHash = await bcrypt.hash(rawPassword, 10);
 
-    // 5. Initial status:
     // 5. Initial status: All accounts are immediately active and usable
     const initialStatus = 'active';
 
@@ -202,7 +207,7 @@ const registerRequest = async (req, res, next) => {
     });
 
     // Sync database and persistent registry
-    UserRegistry.syncToDatabase(pool).catch(() => {});
+    await UserRegistry.syncToDatabase(pool).catch(() => {});
 
     // 8b. Register permanently in Google Firebase Cloud Authentication
     try {
@@ -224,8 +229,16 @@ const registerRequest = async (req, res, next) => {
       console.warn('[AUTH:REGISTER] Firebase Cloud sync note:', cloudErr.message);
     }
 
-    // 8c. Save full user profile in Cloud Firestore
-    saveUserToFirestore(savedUser).catch(() => {});
+    // 8c. Save full user profile (including password_hash for resilient login) in Cloud Firestore
+    try {
+      await saveUserToFirestore({
+        ...savedUser,
+        password_hash: passwordHash
+      });
+      console.log(`[AUTH:REGISTER] User permanently backed up to Cloud Firestore: ${rawEmail}`);
+    } catch (fsErr) {
+      console.warn('[AUTH:REGISTER] Firestore save note:', fsErr.message);
+    }
 
     console.log(`[AUTH:REGISTER] User registered successfully: ${rawEmail} (${rawRole}, status: ${initialStatus})`);
 
@@ -416,6 +429,16 @@ const forgotPasswordReset = async (req, res, next) => {
       console.warn('DB password update warning:', e.message);
     }
 
+    // Update in Cloud Firestore
+    try {
+      const fsUser = await getUserFromFirestore(rawEmail);
+      if (fsUser) {
+        await saveUserToFirestore({ ...fsUser, password_hash: newPasswordHash });
+      }
+    } catch (fsErr) {
+      console.warn('Firestore password update warning:', fsErr.message);
+    }
+
     // Clear reset cache
     passwordResetStore.delete(rawEmail);
 
@@ -480,40 +503,85 @@ const login = async (req, res, next) => {
 
     // 3b. Cloud Persistence Fallback: If user not found locally or password mismatch (e.g. Vercel container cold-start / new session)
     if (!user || !match) {
+      let firestoreUser = null;
       try {
-        const fbResult = await firebaseSignIn(rawEmail, rawPassword);
-        if (fbResult && fbResult.profile) {
-          console.log(`[AUTH:LOGIN] Restoring account from Firebase Cloud Auth for: ${rawEmail}`);
-          const p = fbResult.profile;
-          const restoredPasswordHash = await bcrypt.hash(rawPassword, 10);
-          user = await UserRegistry.registerUser({
-            name: p.name || rawEmail.split('@')[0],
-            email: rawEmail,
-            phone: p.phone || '',
-            password_hash: restoredPasswordHash,
-            role: p.role || 'user',
-            address: p.address || '',
-            city: p.city || '',
-            state: p.state || '',
-            pincode: p.pincode || '',
-            status: p.status || 'active',
-            is_email_verified: 1,
-            ngo_details: p.ngo_details || null,
-            scrap_dealer_details: p.scrap_dealer_details || null
-          });
+        firestoreUser = await getUserFromFirestore(rawEmail);
+      } catch (fsErr) {
+        console.warn('[AUTH:LOGIN] Firestore lookup note:', fsErr.message);
+      }
 
-          try {
-            await pool.query(
-              'INSERT INTO users (name, email, phone, password_hash, role, address, city, state, pincode, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
-              [user.name, user.email, user.phone, user.password_hash, user.role, user.address, user.city, user.state, user.pincode, user.status]
-            );
-          } catch (dbErr) {
-            console.warn('[AUTH:LOGIN] DB insert on restore note:', dbErr.message);
-          }
-          match = true;
-        }
+      let fbResult = null;
+      try {
+        fbResult = await firebaseSignIn(rawEmail, rawPassword);
       } catch (fbErr) {
         console.warn('[AUTH:LOGIN] Firebase Cloud Auth login check note:', fbErr.message);
+      }
+
+      let isCloudVerified = false;
+      if (fbResult) {
+        isCloudVerified = true;
+      } else if (firestoreUser && firestoreUser.password_hash) {
+        try {
+          const fsMatch = await bcrypt.compare(rawPassword, firestoreUser.password_hash);
+          if (fsMatch) {
+            isCloudVerified = true;
+          }
+        } catch (e) {}
+      }
+
+      if (isCloudVerified) {
+        console.log(`[AUTH:LOGIN] Restoring account from Cloud Persistence for: ${rawEmail}`);
+        const sourceData = firestoreUser || (fbResult && fbResult.profile) || {};
+        const restoredPasswordHash = (firestoreUser && firestoreUser.password_hash)
+          ? firestoreUser.password_hash
+          : await bcrypt.hash(rawPassword, 10);
+
+        const restoredProfile = {
+          name: sourceData.name || (fbResult && fbResult.profile && fbResult.profile.name) || rawEmail.split('@')[0],
+          email: rawEmail,
+          phone: sourceData.phone || '',
+          password_hash: restoredPasswordHash,
+          role: sourceData.role || 'user',
+          address: sourceData.address || '',
+          city: sourceData.city || '',
+          state: sourceData.state || '',
+          pincode: sourceData.pincode || '',
+          status: sourceData.status || 'active',
+          is_email_verified: 1,
+          ngo_details: sourceData.ngo_details || null,
+          scrap_dealer_details: sourceData.scrap_dealer_details || null
+        };
+
+        user = await UserRegistry.registerUser(restoredProfile);
+
+        try {
+          await pool.query(
+            'INSERT INTO users (id, name, email, phone, password_hash, role, address, city, state, pincode, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+            [user.id, user.name, user.email, user.phone, user.password_hash, user.role, user.address, user.city, user.state, user.pincode, user.status]
+          );
+
+          if (user.role === 'ngo' && user.ngo_details) {
+            await pool.query(
+              'INSERT INTO ngos (user_id, ngo_name, contact_person, registration_number, description, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
+              [user.id, user.ngo_details.ngo_name || user.name, user.ngo_details.contact_person || user.name, user.ngo_details.registration_number || '', user.ngo_details.description || '', 'approved']
+            );
+          } else if (user.role === 'scrapdealer' && user.scrap_dealer_details) {
+            await pool.query(
+              'INSERT INTO scrap_dealers (user_id, business_name, contact_person, registration_number, accepted_materials, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
+              [user.id, user.scrap_dealer_details.business_name || user.name, user.scrap_dealer_details.contact_person || user.name, user.scrap_dealer_details.registration_number || '', typeof user.scrap_dealer_details.accepted_materials === 'string' ? user.scrap_dealer_details.accepted_materials : JSON.stringify(user.scrap_dealer_details.accepted_materials || []), 'approved']
+            );
+          }
+        } catch (dbErr) {
+          console.warn('[AUTH:LOGIN] DB insert on restore note:', dbErr.message);
+        }
+
+        match = true;
+
+        // Ensure Firestore has the latest password_hash and complete profile
+        await saveUserToFirestore({
+          ...user,
+          password_hash: restoredPasswordHash
+        });
       }
     }
 
@@ -521,17 +589,7 @@ const login = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid email address or password.' });
     }
 
-    // Background cloud sync to keep Firebase Cloud Auth and Cloud Firestore updated
-    firebaseSignUp(rawEmail, rawPassword, {
-      name: user.name,
-      role: user.role,
-      phone: user.phone,
-      address: user.address,
-      city: user.city,
-      state: user.state,
-      pincode: user.pincode,
-      status: user.status
-    }).catch(() => {});
+    // Keep Cloud Firestore and Firebase updated
     saveUserToFirestore(user).catch(() => {});
 
     // 4. Check Admin Approval Status (For NGOs and Scrap Dealers awaiting review)
@@ -595,6 +653,21 @@ const getMe = async (req, res, next) => {
         const [users] = await pool.query('SELECT * FROM users WHERE id = ? OR LOWER(email) = ?', [userId, userEmail || '']);
         if (users && users.length > 0) user = users[0];
       } catch (e) {}
+    }
+
+    // Restore user from Cloud Firestore if container restarted
+    if (!user && (userEmail || userId)) {
+      try {
+        const firestoreUser = await getUserFromFirestore(userEmail || userId);
+        if (firestoreUser) {
+          console.log(`[AUTH:GETME] Restoring user profile from Cloud Firestore for: ${firestoreUser.email}`);
+          user = await UserRegistry.registerUser(firestoreUser);
+          await pool.query(
+            'INSERT INTO users (id, name, email, phone, password_hash, role, address, city, state, pincode, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+            [user.id, user.name, user.email, user.phone || '', user.password_hash || '', user.role || 'user', user.address || '', user.city || '', user.state || '', user.pincode || '', user.status || 'active']
+          ).catch(() => {});
+        }
+      } catch (fsErr) {}
     }
 
     // Auto-heal user from token metadata if container cold-started
@@ -752,6 +825,21 @@ const syncSession = async (req, res, next) => {
         const [dbUsers] = await pool.query('SELECT * FROM users WHERE LOWER(email) = ?', [email]);
         if (dbUsers.length > 0) user = dbUsers[0];
       } catch (e) {}
+    }
+
+    if (!user) {
+      // First try to restore complete persistent profile from Cloud Firestore
+      try {
+        const firestoreUser = await getUserFromFirestore(email);
+        if (firestoreUser) {
+          console.log(`[AUTH:SYNC] Restoring user from Cloud Firestore for: ${email}`);
+          user = await UserRegistry.registerUser(firestoreUser);
+          await pool.query(
+            'INSERT INTO users (id, name, email, phone, password_hash, role, address, city, state, pincode, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+            [user.id, user.name, user.email, user.phone || '', user.password_hash || '', user.role || 'user', user.address || '', user.city || '', user.state || '', user.pincode || '', user.status || 'active']
+          ).catch(() => {});
+        }
+      } catch (fsErr) {}
     }
 
     if (!user) {

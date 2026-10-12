@@ -57,24 +57,30 @@ const createDonation = async (req, res, next) => {
       console.warn('Could not send notification:', notifErr.message);
     }
 
-    // Asynchronously backup donation permanently in Google Cloud Firestore
-    saveDonationToFirestore({
-      request_id,
-      user_id: req.user.id,
-      donor_email: req.user.email || null,
-      donor_name: req.user.name || null,
-      item_name,
-      category,
-      description,
-      condition_state,
-      quantity,
-      address,
-      city,
-      pincode,
-      pickup_date,
-      additional_notes,
-      status: 'PENDING'
-    }).catch(() => {});
+    // Backup donation permanently in Google Cloud Firestore (Awaited to ensure persistence)
+    try {
+      await saveDonationToFirestore({
+        id: result.insertId,
+        request_id,
+        user_id: req.user.id,
+        donor_email: req.user.email || null,
+        donor_name: req.user.name || null,
+        item_name,
+        category,
+        description,
+        condition_state,
+        quantity,
+        image,
+        address,
+        city,
+        pincode,
+        pickup_date,
+        additional_notes,
+        status: 'PENDING'
+      });
+    } catch (fsErr) {
+      console.warn('Firestore donation save note:', fsErr.message);
+    }
 
     res.status(201).json({ message: 'Donation created successfully', id: result.insertId, request_id });
   } catch (error) {
@@ -96,7 +102,6 @@ const getDonations = async (req, res, next) => {
       const ngoId = ngo && ngo.length > 0 ? ngo[0].id : -1;
       
       if (history === 'true' || history === '1') {
-        // Only return received/completed donations for this NGO
         query += ' AND d.ngo_id = ? AND (d.status = "RECEIVED" OR d.status = "COMPLETED")';
         params.push(ngoId);
       } else {
@@ -115,7 +120,35 @@ const getDonations = async (req, res, next) => {
     }
 
     query += ' ORDER BY d.created_at DESC';
-    const [donations] = await pool.query(query, params);
+    let [donations] = await pool.query(query, params);
+
+    // If no donations found for this user, check Cloud Firestore for persistent records
+    if (donations.length === 0 && req.user.role === 'user') {
+      try {
+        const { getAllDonationsFromFirestore } = require('../services/firestoreService');
+        const cloudDonations = await getAllDonationsFromFirestore();
+        const userCloudDonations = cloudDonations.filter(d => 
+          (d.donor_email && req.user.email && d.donor_email.toLowerCase() === req.user.email.toLowerCase()) ||
+          d.user_id == req.user.id
+        );
+
+        for (const cd of userCloudDonations) {
+          const [exists] = await pool.query('SELECT id FROM donations WHERE request_id = ?', [cd.request_id]);
+          if (exists.length === 0) {
+            await pool.query(
+              `INSERT INTO donations (request_id, user_id, ngo_id, item_name, category, description, condition_state, quantity, image, address, city, pincode, pickup_date, additional_notes, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [cd.request_id, req.user.id, cd.ngo_id || null, cd.item_name || 'Donation Item', cd.category || 'General', cd.description || '', cd.condition_state || 'Good', cd.quantity || 1, cd.image || null, cd.address || '', cd.city || '', cd.pincode || '', cd.pickup_date || null, cd.additional_notes || null, cd.status || 'PENDING']
+            ).catch(() => {});
+          }
+        }
+
+        if (userCloudDonations.length > 0) {
+          [donations] = await pool.query(query, params);
+        }
+      } catch (fsSyncErr) {}
+    }
+
     res.json(donations);
   } catch (error) {
     next(error);
@@ -212,6 +245,15 @@ const updateDonationStatus = async (req, res, next) => {
         );
       }
     }
+
+    // Update in Cloud Firestore
+    try {
+      const { updateDonationInFirestore } = require('../services/firestoreService');
+      await updateDonationInFirestore(donation[0].request_id, {
+        status: normalizedStatus,
+        ngo_id: updateQuery.includes('ngo_id') ? (req.user.role === 'ngo' ? (await pool.query('SELECT id FROM ngos WHERE user_id = ?', [req.user.id]))[0]?.[0]?.id : donation[0].ngo_id) : donation[0].ngo_id
+      });
+    } catch (fsErr) {}
 
     res.json({ message: `Donation marked as ${normalizedStatus} successfully`, status: normalizedStatus });
   } catch (error) {
