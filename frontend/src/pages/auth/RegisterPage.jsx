@@ -60,10 +60,9 @@ const RegisterPage = () => {
 
   // Loading & Error States
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const { registerRequest, loginWithGoogle, isAuthenticated, user } = useAuth();
+  const { registerRequest, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already authenticated
@@ -217,26 +216,6 @@ const RegisterPage = () => {
     }
   };
 
-  const handleGoogleRegister = async () => {
-    setError('');
-    setIsGoogleSubmitting(true);
-    try {
-      const data = await loginWithGoogle();
-      if (data && data.user) {
-        if (data.user.role === 'admin') navigate('/admin/dashboard', { replace: true });
-        else if (data.user.role === 'ngo') navigate('/ngo/dashboard', { replace: true });
-        else if (data.user.role === 'scrapdealer') navigate('/dealer/dashboard', { replace: true });
-        else navigate('/dashboard', { replace: true });
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Google registration failed. Please try again.';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setIsGoogleSubmitting(false);
-    }
-  };
-
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/30 py-12 px-4 sm:px-6 lg:px-8 overflow-hidden">
       {/* Ambient background blur elements for elite visual depth */}
@@ -249,21 +228,9 @@ const RegisterPage = () => {
         
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-xs mb-4">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <Leaf className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Join 12,000+ Eco-Citizens & Organizations</span>
-          </div>
-
           <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
             Create Your <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 bg-clip-text text-transparent">EcoDonate</span> Account
           </h1>
-          <p className="mt-2 text-sm text-gray-600 max-w-lg mx-auto leading-relaxed">
-            Give unused goods a second life, schedule instant doorstep recycling, and power transparent community impact.
-          </p>
         </div>
 
         {/* Global Error Notice */}
@@ -279,48 +246,6 @@ const RegisterPage = () => {
         {/* ===================================================================== */}
         {currentStep === 'form' && (
           <form onSubmit={handleSubmitForm} className="space-y-8">
-
-            {/* QUICK ONE-CLICK GOOGLE REGISTRATION BANNER */}
-            <div className="p-4 bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-slate-50 rounded-2xl border border-emerald-200/60 shadow-xs">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white shadow-xs border border-gray-200/80 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">Instant One-Click Sign Up</h3>
-                    <p className="text-xs text-gray-500">Sign up securely with your Google account in 2 seconds</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGoogleRegister}
-                  disabled={isSubmitting || isGoogleSubmitting}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-800 shadow-xs hover:border-gray-400 hover:shadow-sm transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                >
-                  {isGoogleSubmitting ? (
-                    <>
-                      <LoadingSpinner size="small" color="gray" />
-                      <span>Connecting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Continue with Google</span>
-                      <ArrowRight size={14} className="text-gray-400" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="relative flex justify-center text-xs uppercase my-2">
-              <span className="bg-white px-4 text-gray-400 font-semibold tracking-wider">Or register with email & role</span>
-            </div>
 
             {/* ELITE ROLE SELECTOR */}
             <div>
@@ -824,7 +749,7 @@ const RegisterPage = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isSubmitting || isGoogleSubmitting}
+                disabled={isSubmitting}
                 className="w-full py-4 px-6 border border-transparent rounded-2xl shadow-lg shadow-emerald-600/25 text-base font-bold text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
@@ -839,21 +764,6 @@ const RegisterPage = () => {
                   </>
                 )}
               </button>
-            </div>
-
-            {/* Trust and Security Strip */}
-            <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-emerald-600" /> 256-Bit SSL Encrypted
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1.5">
-                <Leaf size={14} className="text-emerald-600" /> Circular Waste Network
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 size={14} className="text-emerald-600" /> Instant Activation
-              </span>
             </div>
 
             {/* Back to Login link */}

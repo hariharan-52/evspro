@@ -594,29 +594,11 @@ const googleLogin = async (req, res, next) => {
       user = UserRegistry.findUser(rawEmail);
     }
 
-    // 2. Auto-register if new user
+    // 2. Strict Check: User must register first before using Google Sign-In
     if (!user) {
-      let dbUserId = null;
-      try {
-        const [result] = await pool.query(
-          'INSERT INTO users (name, email, password_hash, role, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?)',
-          [rawName, rawEmail, 'FIREBASE_GOOGLE_AUTH', 'user', 'active', 1]
-        );
-        dbUserId = result.insertId;
-      } catch (dbInsertErr) {
-        console.warn('[AUTH:GOOGLE] DB insert error:', dbInsertErr.message);
-      }
-
-      user = await UserRegistry.registerUser({
-        id: dbUserId || undefined,
-        name: rawName,
-        email: rawEmail,
-        role: 'user',
-        status: 'active',
-        is_email_verified: 1,
-        profile_image: photoURL
+      return res.status(404).json({
+        message: 'No registered account found with this Google email. Please register your account on the registration page first.'
       });
-      UserRegistry.syncToDatabase(pool).catch(() => {});
     }
 
     // Check account status if deactivated or pending
