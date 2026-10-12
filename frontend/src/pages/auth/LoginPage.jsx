@@ -66,9 +66,23 @@ const LoginPage = () => {
     }
   }, [isAuthenticated, user]);
 
-  // Pre-fill email from query param if redirected from registration
+  const [savedAccounts, setSavedAccounts] = useState([]);
+
+  // Pre-fill email from rememberMe or query param if redirected from registration
   useEffect(() => {
     try {
+      const rememberedEmail = localStorage.getItem('ecodonate_remembered_email');
+      const shouldRemember = localStorage.getItem('ecodonate_remember_me') === 'true';
+      if (rememberedEmail) {
+        setEmail(rememberedEmail);
+        if (shouldRemember) setRememberMe(true);
+      }
+
+      const rawAccounts = localStorage.getItem('ecodonate_saved_accounts');
+      if (rawAccounts) {
+        setSavedAccounts(JSON.parse(rawAccounts));
+      }
+
       const searchParams = new URLSearchParams(location.search);
       const emailParam = searchParams.get('email');
       if (emailParam) {
@@ -130,6 +144,24 @@ const LoginPage = () => {
     setIsSubmitting(true);
     try {
       const data = await login(cleanEmail, password, rememberMe);
+      
+      // Persist login data for this browser
+      if (rememberMe) {
+        localStorage.setItem('ecodonate_remembered_email', cleanEmail);
+        localStorage.setItem('ecodonate_remember_me', 'true');
+      } else {
+        localStorage.removeItem('ecodonate_remembered_email');
+        localStorage.removeItem('ecodonate_remember_me');
+      }
+
+      // Add to recent accounts history
+      try {
+        const raw = localStorage.getItem('ecodonate_saved_accounts') || '[]';
+        const list = JSON.parse(raw).filter(a => a.email !== cleanEmail);
+        list.unshift({ email: cleanEmail, name: data.user.name, role: data.user.role });
+        localStorage.setItem('ecodonate_saved_accounts', JSON.stringify(list.slice(0, 5)));
+      } catch (saveErr) {}
+
       redirectToDashboard(data.user.role);
     } catch (err) {
       const status = err.response?.status;
@@ -371,9 +403,16 @@ const LoginPage = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           {/* Email Address */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">
-              Email Address <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-gray-700">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              {rememberMe && email && (
+                <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                  <CheckCircle2 size={11} /> Saved on this device
+                </span>
+              )}
+            </div>
             <div className="relative">
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
               <input
@@ -390,6 +429,32 @@ const LoginPage = () => {
                 className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               />
             </div>
+
+            {/* Quick-fill Saved Accounts on this Browser */}
+            {savedAccounts && savedAccounts.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider mr-1">Saved logins:</span>
+                {savedAccounts.map((acc) => (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() => {
+                      setEmail(acc.email);
+                      setRememberMe(true);
+                      setLoginError('');
+                    }}
+                    className={`text-xs px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 ${
+                      email.toLowerCase() === acc.email.toLowerCase()
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 font-bold'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 font-medium'
+                    }`}
+                  >
+                    <span>{acc.name || acc.email}</span>
+                    <span className="text-[10px] text-gray-400 capitalize">({acc.role})</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Password */}

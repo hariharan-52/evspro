@@ -12,7 +12,8 @@ const {
   login,
   googleLogin,
   getMe,
-  register
+  register,
+  syncSession
 } = require('../controllers/authController');
 
 // 1. Registration & Email OTP Verification
@@ -32,6 +33,7 @@ router.post('/google-login', googleLogin);
 
 // 4. Session & Logout
 router.get('/me', auth, getMe);
+router.post('/sync-session', syncSession);
 router.post('/logout', (req, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {

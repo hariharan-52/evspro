@@ -66,13 +66,20 @@ const HomePage = () => {
     };
   }, []);
 
+  const hasSavedAccount = typeof window !== 'undefined' && Boolean(
+    localStorage.getItem('token') ||
+    localStorage.getItem('ecodonate_remembered_email') || 
+    localStorage.getItem('ecodonate_saved_accounts')
+  );
+  const authFallbackUrl = hasSavedAccount ? '/login' : '/register';
+
   const donateUrl = isAuthenticated
-    ? (user?.role === 'ngo' ? '/ngo-dashboard' : user?.role === 'scrapdealer' ? '/dealer-dashboard' : user?.role === 'admin' ? '/admin/donations' : '/donate')
-    : '/register';
+    ? (user?.role === 'ngo' ? '/ngo/dashboard' : user?.role === 'scrapdealer' ? '/dealer/dashboard' : user?.role === 'admin' ? '/admin/donations' : '/donate')
+    : authFallbackUrl;
 
   const recycleUrl = isAuthenticated
-    ? (user?.role === 'ngo' ? '/ngo-dashboard' : user?.role === 'scrapdealer' ? '/dealer-dashboard' : user?.role === 'admin' ? '/admin/recycling' : '/recycle')
-    : '/register';
+    ? (user?.role === 'ngo' ? '/ngo/dashboard' : user?.role === 'scrapdealer' ? '/dealer/dashboard' : user?.role === 'admin' ? '/admin/recycling' : '/recycle')
+    : authFallbackUrl;
 
   return (
     <div className="flex flex-col min-h-screen">

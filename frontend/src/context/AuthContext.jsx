@@ -9,7 +9,8 @@ import {
   forgotPasswordSendOtp as apiForgotPasswordSendOtp,
   forgotPasswordVerifyOtp as apiForgotPasswordVerifyOtp,
   forgotPasswordReset as apiForgotPasswordReset,
-  logout as apiLogout
+  logout as apiLogout,
+  syncSession
 } from '../services/auth';
 import { auth, googleProvider } from '../services/firebase';
 import { signInWithPopup } from 'firebase/auth';
@@ -40,7 +41,14 @@ export const AuthProvider = ({ children }) => {
     let cancelled = false;
     const verifyToken = async () => {
       const storedToken = localStorage.getItem('token');
-      if (!storedToken) {
+      const cachedUserData = (() => {
+        try {
+          const s = localStorage.getItem('ecodonate_user');
+          return s ? JSON.parse(s) : null;
+        } catch (e) { return null; }
+      })();
+
+      if (!storedToken && !cachedUserData) {
         if (!cancelled) {
           setLoading(false);
           setIsAuthenticated(false);
@@ -62,8 +70,24 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(true);
         }
       } catch (error) {
-        // If 401 or 403, clear session; if network error, preserve cached offline session
         const status = error?.response?.status;
+
+        // If backend cold-started or ephemeral DB wiped, heal session transparently
+        if ((status === 404 || status === 401) && cachedUserData) {
+          try {
+            console.log('[AuthContext] Attempting self-healing session restoration...');
+            const syncRes = await syncSession(cachedUserData);
+            if (syncRes && syncRes.token && syncRes.user && !cancelled) {
+              saveAuthSession(syncRes.token, syncRes.user);
+              console.log('[AuthContext] Session restored successfully.');
+              return;
+            }
+          } catch (syncErr) {
+            console.warn('[AuthContext] Session auto-heal note:', syncErr.message);
+          }
+        }
+
+        // If explicitly revoked / blocked, clear session; otherwise keep cached session
         if (status === 401 || status === 403) {
           if (!cancelled) {
             localStorage.removeItem('token');
@@ -141,11 +165,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // 2. Direct Registration (Auto-authenticates active users so refresh preserves session)
+  // 2. Direct Registration (Auto-authenticates active users of ALL roles so refresh preserves session)
   const registerRequest = useCallback(async (formData) => {
     try {
       const res = await apiRegisterRequest(formData);
-      if (res && res.token && res.user && res.role === 'user') {
+      if (res && res.token && res.user) {
         saveAuthSession(res.token, res.user);
       }
       return res;

@@ -61,6 +61,7 @@ const RegisterPage = () => {
   // Loading & Error States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   const { registerRequest, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
@@ -74,6 +75,104 @@ const RegisterPage = () => {
       else navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
+
+  // Restore draft from previous session on mount
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem('ecodonate_register_draft');
+      if (savedDraft) {
+        const d = JSON.parse(savedDraft);
+        if (d.name) setName(d.name);
+        if (d.email) setEmail(d.email);
+        if (d.phone) setPhone(d.phone);
+        if (d.address) setAddress(d.address);
+        if (d.city) setCity(d.city);
+        if (d.state) setState(d.state);
+        if (d.pincode) setPincode(d.pincode);
+        if (d.role) setRole(d.role);
+        if (d.ngoName) setNgoName(d.ngoName);
+        if (d.ngoContactPerson) setNgoContactPerson(d.ngoContactPerson);
+        if (d.ngoRegNumber) setNgoRegNumber(d.ngoRegNumber);
+        if (d.ngoDescription) setNgoDescription(d.ngoDescription);
+        if (d.dealerBusinessName) setDealerBusinessName(d.dealerBusinessName);
+        if (d.dealerContactPerson) setDealerContactPerson(d.dealerContactPerson);
+        if (d.dealerRegNumber) setDealerRegNumber(d.dealerRegNumber);
+        if (d.acceptedMaterials && Array.isArray(d.acceptedMaterials)) setAcceptedMaterials(d.acceptedMaterials);
+        if (d.name || d.email || d.phone) {
+          setHasRestoredDraft(true);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  // Auto-save draft whenever user enters registration data
+  useEffect(() => {
+    if (currentStep !== 'form') return;
+    if (!name && !email && !phone && !address) return;
+    try {
+      const draft = {
+        role,
+        name,
+        email,
+        phone,
+        address,
+        city,
+        state,
+        pincode,
+        ngoName,
+        ngoContactPerson,
+        ngoRegNumber,
+        ngoDescription,
+        dealerBusinessName,
+        dealerContactPerson,
+        dealerRegNumber,
+        acceptedMaterials
+      };
+      localStorage.setItem('ecodonate_register_draft', JSON.stringify(draft));
+    } catch (e) {}
+  }, [
+    currentStep,
+    role,
+    name,
+    email,
+    phone,
+    address,
+    city,
+    state,
+    pincode,
+    ngoName,
+    ngoContactPerson,
+    ngoRegNumber,
+    ngoDescription,
+    dealerBusinessName,
+    dealerContactPerson,
+    dealerRegNumber,
+    acceptedMaterials
+  ]);
+
+  const handleClearDraft = () => {
+    try {
+      localStorage.removeItem('ecodonate_register_draft');
+    } catch (e) {}
+    setName('');
+    setEmail('');
+    setPhone('');
+    setAddress('');
+    setCity('');
+    setState('');
+    setPincode('');
+    setPassword('');
+    setConfirmPassword('');
+    setNgoName('');
+    setNgoContactPerson('');
+    setNgoRegNumber('');
+    setNgoDescription('');
+    setDealerBusinessName('');
+    setDealerContactPerson('');
+    setDealerRegNumber('');
+    setHasRestoredDraft(false);
+    toast.success('Registration draft cleared.');
+  };
 
   // Calculate password strength (0 to 4)
   const getPasswordStrength = (pwd) => {
@@ -202,11 +301,19 @@ const RegisterPage = () => {
       const res = await registerRequest(payload);
       toast.success(res.message || 'Account registered successfully!');
 
-      if (role === 'user') {
-        setCurrentStep('success');
-      } else {
-        setCurrentStep('pending');
-      }
+      // Clean up saved draft
+      try {
+        localStorage.removeItem('ecodonate_register_draft');
+        localStorage.setItem('ecodonate_remembered_email', email.trim().toLowerCase());
+        localStorage.setItem('ecodonate_remember_me', 'true');
+        
+        const raw = localStorage.getItem('ecodonate_saved_accounts') || '[]';
+        const list = JSON.parse(raw).filter(a => a.email !== email.trim().toLowerCase());
+        list.unshift({ email: email.trim().toLowerCase(), name: name.trim(), role });
+        localStorage.setItem('ecodonate_saved_accounts', JSON.stringify(list.slice(0, 5)));
+      } catch (cleanErr) {}
+
+      setCurrentStep('success');
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to submit registration. Please try again.';
       setError(msg);
@@ -232,6 +339,23 @@ const RegisterPage = () => {
             Create Your <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 bg-clip-text text-transparent">EcoDonate</span> Account
           </h1>
         </div>
+
+        {/* Draft Restored Banner */}
+        {hasRestoredDraft && currentStep === 'form' && (
+          <div className="mb-6 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between gap-3 animate-fadeIn shadow-2xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+              <span>Draft restored from your previous session. Your entered information is preserved.</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline flex-shrink-0 cursor-pointer"
+            >
+              Clear draft
+            </button>
+          </div>
+        )}
 
         {/* Global Error Notice */}
         {error && (
@@ -822,7 +946,7 @@ const RegisterPage = () => {
             <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
               <button
                 type="button"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate(role === 'ngo' ? '/ngo/dashboard' : role === 'scrapdealer' ? '/dealer/dashboard' : '/dashboard')}
                 className="w-full py-3.5 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
               >
                 <span>Go to Dashboard</span>

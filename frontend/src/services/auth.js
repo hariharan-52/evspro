@@ -60,6 +60,11 @@ export const getMe = async () => {
   return response.data;
 };
 
+export const syncSession = async (user) => {
+  const response = await api.post('/auth/sync-session', { user });
+  return response.data;
+};
+
 export const logout = async () => {
   try {
     await api.post('/auth/logout');
