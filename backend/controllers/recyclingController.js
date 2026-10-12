@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const crypto = require('crypto');
+const { saveRecyclingToFirestore } = require('../services/firestoreService');
 
 const generateId = (prefix) => `${prefix}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
@@ -56,6 +57,25 @@ const createRecycling = async (req, res, next) => {
     } catch (notifErr) {
       console.warn('Could not send notification:', notifErr.message);
     }
+
+    // Asynchronously backup recycling request permanently in Google Cloud Firestore
+    saveRecyclingToFirestore({
+      request_id,
+      user_id: req.user.id,
+      user_email: req.user.email || null,
+      user_name: req.user.name || null,
+      waste_category,
+      description,
+      quantity,
+      quantity_unit,
+      address,
+      city,
+      pincode,
+      pickup_date,
+      ai_prediction,
+      ai_confidence,
+      status: 'PENDING'
+    }).catch(() => {});
 
     res.status(201).json({ message: 'Request created successfully', id: result.insertId, request_id });
   } catch (error) {

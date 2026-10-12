@@ -3,8 +3,8 @@ const bcrypt = require('bcrypt');
 const { pool } = require('../config/database');
 const UserRegistry = require('../data/userRegistry');
 const { sendRegistrationOtp, sendPasswordResetOtp } = require('../services/emailService');
-const { recordFailedAttempt, clearFailedAttempts } = require('../middleware/rateLimiter');
 const { firebaseSignUp, firebaseSignIn } = require('../services/firebaseAuthService');
+const { saveUserToFirestore, getUserFromFirestore } = require('../services/firestoreService');
 
 // In-memory cache for pending registrations: email -> { ...data, password_hash, otp, expiresAt, attempts }
 const pendingRegistrations = new Map();
@@ -223,6 +223,9 @@ const registerRequest = async (req, res, next) => {
     } catch (cloudErr) {
       console.warn('[AUTH:REGISTER] Firebase Cloud sync note:', cloudErr.message);
     }
+
+    // 8c. Save full user profile in Cloud Firestore
+    saveUserToFirestore(savedUser).catch(() => {});
 
     console.log(`[AUTH:REGISTER] User registered successfully: ${rawEmail} (${rawRole}, status: ${initialStatus})`);
 
@@ -518,7 +521,7 @@ const login = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid email address or password.' });
     }
 
-    // Background cloud sync to keep Firebase Cloud Auth updated for this account
+    // Background cloud sync to keep Firebase Cloud Auth and Cloud Firestore updated
     firebaseSignUp(rawEmail, rawPassword, {
       name: user.name,
       role: user.role,
@@ -529,6 +532,7 @@ const login = async (req, res, next) => {
       pincode: user.pincode,
       status: user.status
     }).catch(() => {});
+    saveUserToFirestore(user).catch(() => {});
 
     // 4. Check Admin Approval Status (For NGOs and Scrap Dealers awaiting review)
     if (user.status === 'pending') {

@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const crypto = require('crypto');
+const { saveDonationToFirestore } = require('../services/firestoreService');
 
 const generateId = (prefix) => `${prefix}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
@@ -55,6 +56,25 @@ const createDonation = async (req, res, next) => {
     } catch (notifErr) {
       console.warn('Could not send notification:', notifErr.message);
     }
+
+    // Asynchronously backup donation permanently in Google Cloud Firestore
+    saveDonationToFirestore({
+      request_id,
+      user_id: req.user.id,
+      donor_email: req.user.email || null,
+      donor_name: req.user.name || null,
+      item_name,
+      category,
+      description,
+      condition_state,
+      quantity,
+      address,
+      city,
+      pincode,
+      pickup_date,
+      additional_notes,
+      status: 'PENDING'
+    }).catch(() => {});
 
     res.status(201).json({ message: 'Donation created successfully', id: result.insertId, request_id });
   } catch (error) {
