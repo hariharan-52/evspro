@@ -6,6 +6,12 @@ export const login = async (email, password, rememberMe = false) => {
   return response.data;
 };
 
+// 1b. Google Firebase Authentication Login
+export const googleLogin = async (userData) => {
+  const response = await api.post('/auth/google-login', userData);
+  return response.data;
+};
+
 // 2. Production Registration & Email OTP Flow
 export const registerRequest = async (registrationData) => {
   const response = await api.post('/auth/register-request', registrationData);

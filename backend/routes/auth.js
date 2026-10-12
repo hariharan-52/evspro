@@ -10,6 +10,7 @@ const {
   forgotPasswordVerifyOtp,
   forgotPasswordReset,
   login,
+  googleLogin,
   getMe,
   register
 } = require('../controllers/authController');
@@ -27,6 +28,7 @@ router.post('/forgot-password/reset', forgotPasswordReset);
 
 // 3. Login
 router.post('/login', loginRateLimiter, login);
+router.post('/google-login', googleLogin);
 
 // 4. Session & Logout
 router.get('/me', auth, getMe);

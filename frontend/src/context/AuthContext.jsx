@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useCallback, useRef } from '
 import {
   getMe,
   login as apiLogin,
+  googleLogin as apiGoogleLogin,
   registerRequest as apiRegisterRequest,
   verifyRegistrationOtp as apiVerifyRegistrationOtp,
   resendRegistrationOtp as apiResendRegistrationOtp,
@@ -10,6 +11,8 @@ import {
   forgotPasswordReset as apiForgotPasswordReset,
   logout as apiLogout
 } from '../services/auth';
+import { auth, googleProvider } from '../services/firebase';
+import { signInWithPopup } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 
 export const AuthContext = createContext(null);
@@ -100,6 +103,34 @@ export const AuthProvider = ({ children }) => {
       return data;
     } catch (error) {
       // Re-throw so page components can display specific error messages or status banners
+      throw error;
+    } finally {
+      authInProgressRef.current = false;
+    }
+  }, []);
+
+  // 1b. Google Firebase Authentication Login
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      authInProgressRef.current = true;
+      const result = await signInWithPopup(auth, googleProvider);
+      const firebaseUser = result.user;
+
+      const payload = {
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || 'Google User',
+        photoURL: firebaseUser.photoURL || null,
+        uid: firebaseUser.uid
+      };
+
+      const data = await apiGoogleLogin(payload);
+      saveAuthSession(data.token, data.user);
+      toast.success(data.message || `Welcome, ${data.user.name}!`);
+      return data;
+    } catch (error) {
+      if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+        return null;
+      }
       throw error;
     } finally {
       authInProgressRef.current = false;
@@ -209,6 +240,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         isAuthenticated,
         login,
+        loginWithGoogle,
         saveAuthSession,
         register: registerRequest,
         registerRequest,

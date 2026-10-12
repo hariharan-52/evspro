@@ -82,21 +82,25 @@ EcoDonate promotes:
 
 The AI waste classifier is a **mock service** for demonstration. To connect a real ML model, edit `backend/services/aiClassifier.js` and replace the mock logic with your ML API call.
 
+## 🔥 Firebase Setup
+
+To enable Firebase features (Authentication, Firestore, Storage):
+
+1. Create a project in [Firebase Console](https://console.firebase.google.com/).
+2. Register a Web App and copy your config keys.
+3. In `frontend/`, create `.env` using `frontend/.env.example` as a template:
+   ```env
+   VITE_FIREBASE_API_KEY=your_api_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   ```
+4. Firebase services are ready to import from [`frontend/src/services/firebase.js`](frontend/src/services/firebase.js).
+
 ---
 
 © 2026 EcoDonate. *Small actions. Big impact.*
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

@@ -567,10 +567,94 @@ const getMe = async (req, res, next) => {
 };
 
 // ============================================================================
-// 9. BACKWARD COMPATIBLE REGISTER (Direct register fallback if ever called)
+// 10. GOOGLE LOGIN (Firebase Auth verification & sync)
 // ============================================================================
-const register = async (req, res, next) => {
-  return registerRequest(req, res, next);
+const googleLogin = async (req, res, next) => {
+  try {
+    const rawEmail = (req.body.email || '').trim().toLowerCase();
+    const rawName = (req.body.name || req.body.displayName || 'Google User').trim();
+    const photoURL = req.body.photoURL || null;
+
+    if (!rawEmail) {
+      return res.status(400).json({ message: 'Email is required from Google account.' });
+    }
+
+    // 1. Look up user in SQL Database or UserRegistry
+    let user = null;
+    try {
+      const [dbUsers] = await pool.query('SELECT * FROM users WHERE LOWER(email) = ?', [rawEmail]);
+      if (dbUsers && dbUsers.length > 0) {
+        user = dbUsers[0];
+      }
+    } catch (dbErr) {
+      console.warn('[AUTH:GOOGLE] DB lookup warning:', dbErr.message);
+    }
+
+    if (!user) {
+      user = UserRegistry.findUser(rawEmail);
+    }
+
+    // 2. Auto-register if new user
+    if (!user) {
+      let dbUserId = null;
+      try {
+        const [result] = await pool.query(
+          'INSERT INTO users (name, email, password_hash, role, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?)',
+          [rawName, rawEmail, 'FIREBASE_GOOGLE_AUTH', 'user', 'active', 1]
+        );
+        dbUserId = result.insertId;
+      } catch (dbInsertErr) {
+        console.warn('[AUTH:GOOGLE] DB insert error:', dbInsertErr.message);
+      }
+
+      user = await UserRegistry.registerUser({
+        id: dbUserId || undefined,
+        name: rawName,
+        email: rawEmail,
+        role: 'user',
+        status: 'active',
+        is_email_verified: 1,
+        profile_image: photoURL
+      });
+      UserRegistry.syncToDatabase(pool).catch(() => {});
+    }
+
+    // Check account status if deactivated or pending
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        message: 'Your account is awaiting Admin approval.',
+        code: 'ACCOUNT_PENDING'
+      });
+    }
+    if (user.status === 'rejected' || user.status === 'inactive') {
+      return res.status(403).json({
+        message: 'Your account access has been restricted by the administrator.',
+        code: 'ACCOUNT_BLOCKED'
+      });
+    }
+
+    const token = generateToken(user, '7d');
+
+    console.log(`[AUTH:GOOGLE] ✅ Google login successful for: ${user.email} (${user.role})`);
+
+    return res.json({
+      success: true,
+      message: `Welcome, ${user.name}!`,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone || '',
+        role: user.role,
+        name: user.name,
+        status: user.status || 'active',
+        profile_image: user.profile_image || photoURL
+      }
+    });
+  } catch (error) {
+    console.error('[AUTH:GOOGLE] Exception:', error.message);
+    next(error);
+  }
 };
 
 module.exports = {
@@ -581,6 +665,7 @@ module.exports = {
   forgotPasswordVerifyOtp,
   forgotPasswordReset,
   login,
+  googleLogin,
   getMe,
   register
 };
