@@ -112,6 +112,10 @@ export const AuthProvider = ({ children }) => {
   // 1b. Google Firebase Authentication Login
   const loginWithGoogle = useCallback(async () => {
     try {
+      if (!auth || !googleProvider) {
+        toast.error('Google Sign-In is unavailable or still initializing. Please try again.');
+        return null;
+      }
       authInProgressRef.current = true;
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
