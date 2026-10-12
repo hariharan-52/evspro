@@ -152,11 +152,33 @@ const getUserDashboard = async (req, res, next) => {
 
 const getUserImpact = async (req, res, next) => {
   try {
-    const [impacts] = await pool.query(
-      `SELECT SUM(waste_weight_kg) as total_waste, SUM(items_count) as total_items, SUM(co2_saved_kg) as total_co2, SUM(impact_score) as total_score 
-       FROM impact_records WHERE user_id = ?`, [req.user.id]
+    const userId = req.user.id;
+    const [userDonations] = await pool.query(
+      'SELECT COALESCE(SUM(quantity), 0) as items, COUNT(*) as c FROM donations WHERE user_id = ? AND status NOT IN ("REJECTED", "CANCELLED")',
+      [userId]
     );
-    res.json(impacts[0] || {});
+    const [userRecycling] = await pool.query(
+      'SELECT COALESCE(SUM(quantity), 0) as waste_kg, COUNT(*) as c FROM recycling_requests WHERE user_id = ? AND status NOT IN ("REJECTED", "CANCELLED")',
+      [userId]
+    );
+    const [impacts] = await pool.query(
+      `SELECT COALESCE(SUM(waste_weight_kg), 0) as total_waste, COALESCE(SUM(items_count), 0) as total_items, COALESCE(SUM(co2_saved_kg), 0) as total_co2, COALESCE(SUM(impact_score), 0) as total_score 
+       FROM impact_records WHERE user_id = ?`, [userId]
+    );
+
+    const totalItems = Math.max(Number(userDonations[0]?.items || 0), Number(impacts[0]?.total_items || 0));
+    const totalWaste = Math.round(Math.max(Number(userRecycling[0]?.waste_kg || 0), Number(impacts[0]?.total_waste || 0)) * 10) / 10;
+    const calcCo2 = Math.round(((totalItems * 2.5) + (totalWaste * 1.5)) * 10) / 10;
+    const totalCo2 = Math.max(calcCo2, Math.round(Number(impacts[0]?.total_co2 || 0) * 10) / 10);
+    const calcScore = Math.round((totalItems * 5) + (totalWaste * 2));
+    const totalScore = Math.max(calcScore, Number(impacts[0]?.total_score || 0));
+
+    res.json({
+      total_waste: totalWaste,
+      total_items: totalItems,
+      total_co2: totalCo2,
+      total_score: totalScore
+    });
   } catch (error) {
     next(error);
   }

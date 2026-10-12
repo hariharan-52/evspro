@@ -1,28 +1,78 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Leaf, Recycle, Gift, Globe2, Heart, Users, MapPin } from 'lucide-react';
+import { ArrowRight, Leaf, Recycle, Gift, Globe2, Heart, Users, MapPin, Sparkles } from 'lucide-react';
 import api from '../../services/api';
+import useAuth from '../../hooks/useAuth';
 
 const HomePage = () => {
+  const { user, isAuthenticated } = useAuth();
   const [stats, setStats] = useState({
-    donations: 1250,
-    recycled: 5400,
-    diverted: 8900,
-    ngos: 45,
-    partners: 12
+    donations: 0,
+    recycled: 0,
+    diverted: 0,
+    ngos: 0,
+    partners: 0
   });
+  const [loading, setLoading] = useState(true);
+
+  const fetchStats = async () => {
+    try {
+      const res = await api.get('/impact');
+      if (res.data) {
+        setStats({
+          donations: Number(res.data.donations ?? res.data.total_items ?? 0),
+          recycled: Number(res.data.recycled ?? res.data.total_waste_kg ?? 0),
+          diverted: Number(res.data.diverted ?? res.data.total_co2 ?? 0),
+          ngos: Number(res.data.ngos ?? res.data.ngos_connected ?? 0),
+          partners: Number(res.data.partners ?? res.data.recycling_partners ?? 0)
+        });
+        setLoading(false);
+      }
+    } catch (err) {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await api.get('/impact');
-        if (res.data) setStats(res.data);
-      } catch (err) {
-        // Fallback to initial state if api not ready
+    let isMounted = true;
+    fetchStats();
+
+    // Auto-poll every 5 seconds so live updates made by any user reflect in real-time
+    const interval = setInterval(() => {
+      if (isMounted) fetchStats();
+    }, 5000);
+
+    // Event listeners for window focus, custom mutation event, and cross-tab storage
+    const handleUpdate = () => {
+      if (isMounted) fetchStats();
+    };
+
+    const handleStorage = (e) => {
+      if (e.key === 'eco_last_impact_update' && isMounted) {
+        fetchStats();
       }
     };
-    fetchStats();
+
+    window.addEventListener('focus', handleUpdate);
+    window.addEventListener('eco_impact_updated', handleUpdate);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleUpdate);
+      window.removeEventListener('eco_impact_updated', handleUpdate);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
+
+  const donateUrl = isAuthenticated
+    ? (user?.role === 'ngo' ? '/ngo-dashboard' : user?.role === 'scrapdealer' ? '/dealer-dashboard' : user?.role === 'admin' ? '/admin/donations' : '/donate')
+    : '/register';
+
+  const recycleUrl = isAuthenticated
+    ? (user?.role === 'ngo' ? '/ngo-dashboard' : user?.role === 'scrapdealer' ? '/dealer-dashboard' : user?.role === 'admin' ? '/admin/recycling' : '/recycle')
+    : '/register';
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -37,47 +87,97 @@ const HomePage = () => {
               Join the movement to reduce landfill waste. Donate reusable items to those in need or properly recycle your waste with our trusted partners.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/register" className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-full font-semibold text-lg flex items-center justify-center transition-all shadow-lg hover:shadow-xl hover:-translate-y-1">
+              <Link to={donateUrl} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-full font-semibold text-lg flex items-center justify-center transition-all shadow-lg hover:shadow-xl hover:-translate-y-1">
                 Donate Now <Heart className="ml-2 h-5 w-5" />
               </Link>
-              <Link to="/register" className="bg-white hover:bg-gray-50 text-green-700 border-2 border-green-200 px-8 py-4 rounded-full font-semibold text-lg flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-1">
+              <Link to={recycleUrl} className="bg-white hover:bg-gray-50 text-green-700 border-2 border-green-200 px-8 py-4 rounded-full font-semibold text-lg flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-1">
                 Recycle Waste <Recycle className="ml-2 h-5 w-5" />
               </Link>
             </div>
           </div>
         </div>
         {/* Decorative elements */}
-        <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 opacity-20">
+        <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 opacity-20 pointer-events-none">
            <Leaf className="w-96 h-96 text-green-500" />
         </div>
-        <div className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/4 opacity-10">
+        <div className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/4 opacity-10 pointer-events-none">
            <Globe2 className="w-[500px] h-[500px] text-green-600" />
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-white relative -mt-16 z-20 max-w-6xl mx-auto rounded-3xl shadow-xl w-[95%]">
+      {/* Stats Section with Live Community Data */}
+      <section className="py-12 bg-white relative -mt-16 z-20 max-w-6xl mx-auto rounded-3xl shadow-xl w-[95%] border border-gray-100/80">
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-emerald-600" /> Live Platform Impact • Real-Time Data
+          </span>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 px-8">
-          <div className="text-center">
-            <div className="text-4xl font-bold text-green-600 mb-2">{stats.donations.toLocaleString()}+</div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Items Donated</div>
+          <div className="text-center group transition-transform duration-200 hover:-translate-y-0.5">
+            <div className="text-4xl font-extrabold text-green-600 mb-2">
+              {loading ? (
+                <span className="inline-block animate-pulse text-gray-300">...</span>
+              ) : (
+                `${stats.donations.toLocaleString()}${stats.donations > 0 ? '+' : ''}`
+              )}
+            </div>
+            <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Items Donated</div>
           </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-teal-600 mb-2">{stats.recycled.toLocaleString()}kg</div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Waste Recycled</div>
+
+          <div className="text-center group transition-transform duration-200 hover:-translate-y-0.5">
+            <div className="text-4xl font-extrabold text-teal-600 mb-2">
+              {loading ? (
+                <span className="inline-block animate-pulse text-gray-300">...</span>
+              ) : (
+                `${stats.recycled.toLocaleString(undefined, { maximumFractionDigits: 1 })}kg`
+              )}
+            </div>
+            <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Waste Recycled</div>
           </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-blue-600 mb-2">{stats.diverted.toLocaleString()}kg</div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">CO2 Diverted</div>
+
+          <div className="text-center group transition-transform duration-200 hover:-translate-y-0.5">
+            <div className="text-4xl font-extrabold text-blue-600 mb-2">
+              {loading ? (
+                <span className="inline-block animate-pulse text-gray-300">...</span>
+              ) : (
+                `${stats.diverted.toLocaleString(undefined, { maximumFractionDigits: 1 })}kg`
+              )}
+            </div>
+            <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">CO2 Diverted</div>
           </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-purple-600 mb-2">{stats.ngos}+</div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">NGO Partners</div>
+
+          <div className="text-center group transition-transform duration-200 hover:-translate-y-0.5">
+            <div className="text-4xl font-extrabold text-purple-600 mb-2">
+              {loading ? (
+                <span className="inline-block animate-pulse text-gray-300">...</span>
+              ) : (
+                `${stats.ngos}${stats.ngos > 0 ? '+' : ''}`
+              )}
+            </div>
+            <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">NGO Partners</div>
           </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-orange-600 mb-2">{stats.partners}+</div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Scrap Dealers</div>
+
+          <div className="text-center group transition-transform duration-200 hover:-translate-y-0.5">
+            <div className="text-4xl font-extrabold text-orange-600 mb-2">
+              {loading ? (
+                <span className="inline-block animate-pulse text-gray-300">...</span>
+              ) : (
+                `${stats.partners}${stats.partners > 0 ? '+' : ''}`
+              )}
+            </div>
+            <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Scrap Dealers</div>
           </div>
+        </div>
+
+        <div className="text-center mt-6">
+          <Link to="/impact" className="text-xs font-medium text-gray-400 hover:text-green-600 transition-colors inline-flex items-center gap-1">
+            Explore full verified impact report <ArrowRight className="w-3 h-3" />
+          </Link>
         </div>
       </section>
 
@@ -177,7 +277,7 @@ const HomePage = () => {
       {/* CTA */}
       <section className="py-20 bg-gray-50 text-center">
         <h2 className="text-4xl font-bold text-gray-900 mb-6">Start making an impact today.</h2>
-        <Link to="/register" className="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-full font-semibold text-lg transition-colors">
+        <Link to={donateUrl} className="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-full font-semibold text-lg transition-colors">
           Get Started <ArrowRight className="ml-2 h-5 w-5" />
         </Link>
       </section>

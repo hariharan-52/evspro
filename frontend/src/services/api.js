@@ -20,9 +20,24 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor — handle 401 gracefully
+// Response interceptor — handle impact update broadcasting & 401 gracefully
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If a modifying action on donations or recycling succeeds, broadcast impact update event
+    const method = (response.config?.method || '').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const url = response.config?.url || '';
+      if (url.includes('donation') || url.includes('recycling') || url.includes('ngo') || url.includes('scrap')) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('eco_impact_updated', { detail: { url, method } }));
+          try {
+            localStorage.setItem('eco_last_impact_update', Date.now().toString());
+          } catch (e) {}
+        }
+      }
+    }
+    return response;
+  },
   (error) => {
     const url = error.config?.url || '';
     

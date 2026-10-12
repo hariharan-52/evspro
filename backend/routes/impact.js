@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const { getPlatformImpact, getUserImpact } = require('../controllers/impactController');
 
+router.get('/', getPlatformImpact);
 router.get('/platform', getPlatformImpact);
 router.get('/user', auth, getUserImpact);
 
