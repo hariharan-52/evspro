@@ -4,6 +4,7 @@ const { pool } = require('../config/database');
 const UserRegistry = require('../data/userRegistry');
 const { sendRegistrationOtp, sendPasswordResetOtp } = require('../services/emailService');
 const { recordFailedAttempt, clearFailedAttempts } = require('../middleware/rateLimiter');
+const { firebaseSignUp, firebaseSignIn } = require('../services/firebaseAuthService');
 
 // In-memory cache for pending registrations: email -> { ...data, password_hash, otp, expiresAt, attempts }
 const pendingRegistrations = new Map();
@@ -22,7 +23,7 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ecodonate_default_jwt_secret_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'ecodonate_super_secret_jwt_key_2026';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 const generateToken = (user, expiresIn = JWT_EXPIRES_IN) => {
@@ -202,6 +203,26 @@ const registerRequest = async (req, res, next) => {
 
     // Sync database and persistent registry
     UserRegistry.syncToDatabase(pool).catch(() => {});
+
+    // 8b. Register permanently in Google Firebase Cloud Authentication
+    try {
+      const cloudProfile = {
+        name: rawName,
+        role: rawRole,
+        phone: rawPhone,
+        address: rawAddress,
+        city: rawCity,
+        state: rawState,
+        pincode: rawPincode,
+        status: initialStatus,
+        ngo_details: ngoDetails,
+        scrap_dealer_details: scrapDealerDetails
+      };
+      await firebaseSignUp(rawEmail, rawPassword, cloudProfile);
+      console.log(`[AUTH:REGISTER] User permanently registered in Firebase Cloud Auth: ${rawEmail}`);
+    } catch (cloudErr) {
+      console.warn('[AUTH:REGISTER] Firebase Cloud sync note:', cloudErr.message);
+    }
 
     console.log(`[AUTH:REGISTER] User registered successfully: ${rawEmail} (${rawRole}, status: ${initialStatus})`);
 
@@ -439,18 +460,14 @@ const login = async (req, res, next) => {
       user = UserRegistry.findUser(rawEmail);
     }
 
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid email address or password.' });
-    }
-
-    // 3. Verify password strictly using bcrypt
+    // 3. Verify password strictly using bcrypt if user found locally
     let match = false;
-    if (user.password_hash) {
+    if (user && user.password_hash) {
       try {
         match = await bcrypt.compare(rawPassword, user.password_hash);
       } catch (e) {}
     }
-    if (!match) {
+    if (!match && user) {
       const regUser = UserRegistry.findUser(rawEmail);
       if (regUser) {
         match = await UserRegistry.verifyPassword(regUser, rawPassword);
@@ -458,9 +475,60 @@ const login = async (req, res, next) => {
       }
     }
 
-    if (!match) {
+    // 3b. Cloud Persistence Fallback: If user not found locally or password mismatch (e.g. Vercel container cold-start / new session)
+    if (!user || !match) {
+      try {
+        const fbResult = await firebaseSignIn(rawEmail, rawPassword);
+        if (fbResult && fbResult.profile) {
+          console.log(`[AUTH:LOGIN] Restoring account from Firebase Cloud Auth for: ${rawEmail}`);
+          const p = fbResult.profile;
+          const restoredPasswordHash = await bcrypt.hash(rawPassword, 10);
+          user = await UserRegistry.registerUser({
+            name: p.name || rawEmail.split('@')[0],
+            email: rawEmail,
+            phone: p.phone || '',
+            password_hash: restoredPasswordHash,
+            role: p.role || 'user',
+            address: p.address || '',
+            city: p.city || '',
+            state: p.state || '',
+            pincode: p.pincode || '',
+            status: p.status || 'active',
+            is_email_verified: 1,
+            ngo_details: p.ngo_details || null,
+            scrap_dealer_details: p.scrap_dealer_details || null
+          });
+
+          try {
+            await pool.query(
+              'INSERT INTO users (name, email, phone, password_hash, role, address, city, state, pincode, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+              [user.name, user.email, user.phone, user.password_hash, user.role, user.address, user.city, user.state, user.pincode, user.status]
+            );
+          } catch (dbErr) {
+            console.warn('[AUTH:LOGIN] DB insert on restore note:', dbErr.message);
+          }
+          match = true;
+        }
+      } catch (fbErr) {
+        console.warn('[AUTH:LOGIN] Firebase Cloud Auth login check note:', fbErr.message);
+      }
+    }
+
+    if (!user || !match) {
       return res.status(401).json({ message: 'Invalid email address or password.' });
     }
+
+    // Background cloud sync to keep Firebase Cloud Auth updated for this account
+    firebaseSignUp(rawEmail, rawPassword, {
+      name: user.name,
+      role: user.role,
+      phone: user.phone,
+      address: user.address,
+      city: user.city,
+      state: user.state,
+      pincode: user.pincode,
+      status: user.status
+    }).catch(() => {});
 
     // 4. Check Admin Approval Status (For NGOs and Scrap Dealers awaiting review)
     if (user.status === 'pending') {
@@ -515,11 +583,33 @@ const login = async (req, res, next) => {
 const getMe = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    let user = UserRegistry.findUser(userId);
+    const userEmail = req.user.email ? req.user.email.toLowerCase() : null;
+    let user = UserRegistry.findUser(userId) || (userEmail ? UserRegistry.findUser(userEmail) : null);
 
     if (!user) {
-      const [users] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
-      if (users.length > 0) user = users[0];
+      try {
+        const [users] = await pool.query('SELECT * FROM users WHERE id = ? OR LOWER(email) = ?', [userId, userEmail || '']);
+        if (users && users.length > 0) user = users[0];
+      } catch (e) {}
+    }
+
+    // Auto-heal user from token metadata if container cold-started
+    if (!user && (userEmail || req.user.name)) {
+      console.log(`[AUTH:GETME] Auto-restoring user session from token: ${userEmail}`);
+      user = await UserRegistry.registerUser({
+        id: userId,
+        name: req.user.name || (userEmail ? userEmail.split('@')[0] : 'User'),
+        email: userEmail,
+        role: req.user.role || 'user',
+        status: 'active',
+        is_email_verified: 1
+      });
+      try {
+        await pool.query(
+          'INSERT INTO users (id, name, email, role, status, is_email_verified) VALUES (?, ?, ?, ?, "active", 1)',
+          [user.id, user.name, user.email, user.role]
+        );
+      } catch (e) {}
     }
 
     if (!user) {
