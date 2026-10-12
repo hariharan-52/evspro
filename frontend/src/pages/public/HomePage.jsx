@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Leaf, Recycle, Gift, Globe2, Heart, Users, MapPin, Sparkles } from 'lucide-react';
+import { ArrowRight, Leaf, Recycle, Gift, Globe2, Heart, Users, MapPin } from 'lucide-react';
 import api from '../../services/api';
 import useAuth from '../../hooks/useAuth';
 
@@ -107,16 +107,6 @@ const HomePage = () => {
 
       {/* Stats Section with Live Community Data */}
       <section className="py-12 bg-white relative -mt-16 z-20 max-w-6xl mx-auto rounded-3xl shadow-xl w-[95%] border border-gray-100/80">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-          </span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-emerald-600" /> Live Platform Impact • Real-Time Data
-          </span>
-        </div>
-
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 px-8">
           <div className="text-center group transition-transform duration-200 hover:-translate-y-0.5">
             <div className="text-4xl font-extrabold text-green-600 mb-2">
