@@ -657,6 +657,8 @@ const googleLogin = async (req, res, next) => {
   }
 };
 
+const register = registerRequest;
+
 module.exports = {
   registerRequest,
   verifyRegistrationOtp,
