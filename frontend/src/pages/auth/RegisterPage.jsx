@@ -14,10 +14,11 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  RefreshCw,
   AlertCircle,
   ArrowRight,
-  ArrowLeft
+  Sparkles,
+  ShieldAlert,
+  Compass
 } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 import { toast } from 'react-hot-toast';
@@ -65,7 +66,7 @@ const RegisterPage = () => {
   const { registerRequest, loginWithGoogle, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already authenticated (preserves user state on page refresh)
+  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
       if (user.role === 'admin') navigate('/admin/dashboard', { replace: true });
@@ -75,6 +76,21 @@ const RegisterPage = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
+  // Calculate password strength (0 to 4)
+  const getPasswordStrength = (pwd) => {
+    if (!pwd) return 0;
+    let score = 0;
+    if (pwd.length >= 6) score += 1;
+    if (pwd.length >= 10) score += 1;
+    if (/[0-9]/.test(pwd)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+    return score;
+  };
+
+  const passwordStrength = getPasswordStrength(password);
+  const strengthLabels = ['Too weak', 'Fair', 'Good', 'Strong', 'Ultra Strong'];
+  const strengthColors = ['bg-rose-500', 'bg-amber-500', 'bg-emerald-500', 'bg-teal-500', 'bg-green-600'];
+
   const handleMaterialToggle = (material) => {
     setAcceptedMaterials((prev) =>
       prev.includes(material)
@@ -83,9 +99,7 @@ const RegisterPage = () => {
     );
   };
 
-  // ============================================================================
   // Direct Registration Form Submit
-  // ============================================================================
   const handleSubmitForm = async (e) => {
     e.preventDefault();
     setError('');
@@ -122,14 +136,14 @@ const RegisterPage = () => {
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match. Please ensure both passwords match.');
+      setError('Passwords do not match. Please verify your entries.');
       return;
     }
 
     // Role-specific validations
     if (role === 'ngo') {
       if (!ngoName.trim()) {
-        setError('Please enter the NGO / Organization Name.');
+        setError('Please enter the official NGO / Organization Name.');
         return;
       }
       if (!ngoContactPerson.trim()) {
@@ -142,7 +156,7 @@ const RegisterPage = () => {
       }
     } else if (role === 'scrapdealer') {
       if (!dealerBusinessName.trim()) {
-        setError('Please enter the Dealer / Business Name.');
+        setError('Please enter the Scrap Dealer / Business Name.');
         return;
       }
       if (!dealerContactPerson.trim()) {
@@ -154,7 +168,7 @@ const RegisterPage = () => {
         return;
       }
       if (acceptedMaterials.length === 0) {
-        setError('Please select at least one recyclable material that you accept.');
+        setError('Please select at least one recyclable material you accept.');
         return;
       }
     }
@@ -224,87 +238,166 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-[90vh] flex items-center justify-center bg-gradient-to-b from-gray-50 to-green-50/30 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl w-full bg-white p-7 sm:p-10 rounded-3xl shadow-xl border border-gray-100 transition-all">
+    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/30 py-12 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      {/* Ambient background blur elements for elite visual depth */}
+      <div className="absolute -top-32 -right-32 w-96 h-96 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 -left-36 w-96 h-96 bg-teal-400/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 right-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Main Glassmorphic Container */}
+      <div className="relative max-w-3xl mx-auto bg-white/95 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_70px_-15px_rgba(16,185,129,0.14),0_10px_30px_-5px_rgba(0,0,0,0.04)] border border-emerald-100/80 p-6 sm:p-12 transition-all">
         
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex p-3 bg-green-100/80 rounded-2xl border border-green-200 shadow-xs mb-3">
-            <Leaf className="h-8 w-8 text-green-600 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-xs mb-4">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <Leaf className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Join 12,000+ Eco-Citizens & Organizations</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-            Create Your EcoDonate Account
+
+          <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
+            Create Your <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 bg-clip-text text-transparent">EcoDonate</span> Account
           </h1>
-          <p className="mt-1.5 text-sm text-gray-500">
-            Join the movement giving waste a second life & powering circular community impact
+          <p className="mt-2 text-sm text-gray-600 max-w-lg mx-auto leading-relaxed">
+            Give unused goods a second life, schedule instant doorstep recycling, and power transparent community impact.
           </p>
         </div>
 
-        {/* Global Error Banner */}
+        {/* Global Error Notice */}
         {error && (
-          <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-3 animate-fadeIn">
-            <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-sm text-rose-700 flex items-start gap-3 animate-fadeIn shadow-xs">
+            <AlertCircle size={20} className="text-rose-500 flex-shrink-0 mt-0.5" />
             <div className="font-semibold leading-relaxed">{error}</div>
           </div>
         )}
 
         {/* ===================================================================== */}
-        {/* SCREEN 1: REGISTRATION FORM & ROLE SELECTION */}
+        {/* SCREEN 1: REGISTRATION FORM */}
         {/* ===================================================================== */}
         {currentStep === 'form' && (
-          <form onSubmit={handleSubmitForm} className="space-y-6">
-            
-            {/* Role Question */}
+          <form onSubmit={handleSubmitForm} className="space-y-8">
+
+            {/* QUICK ONE-CLICK GOOGLE REGISTRATION BANNER */}
+            <div className="p-4 bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-slate-50 rounded-2xl border border-emerald-200/60 shadow-xs">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white shadow-xs border border-gray-200/80 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Instant One-Click Sign Up</h3>
+                    <p className="text-xs text-gray-500">Sign up securely with your Google account in 2 seconds</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGoogleRegister}
+                  disabled={isSubmitting || isGoogleSubmitting}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-800 shadow-xs hover:border-gray-400 hover:shadow-sm transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                >
+                  {isGoogleSubmitting ? (
+                    <>
+                      <LoadingSpinner size="small" color="gray" />
+                      <span>Connecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue with Google</span>
+                      <ArrowRight size={14} className="text-gray-400" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="relative flex justify-center text-xs uppercase my-2">
+              <span className="bg-white px-4 text-gray-400 font-semibold tracking-wider">Or register with email & role</span>
+            </div>
+
+            {/* ELITE ROLE SELECTOR */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 mb-2">
-                What type of account do you want to create? <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-xs font-black uppercase tracking-wider text-gray-500">
+                  Select Your Account Role <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  {role === 'user' ? '✨ Donor Account' : role === 'ngo' ? '🏢 NGO / Charity' : '♻️ Scrap Dealer'}
+                </span>
+              </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* 1. User */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                {/* 1. Individual User */}
                 <button
                   type="button"
                   onClick={() => { setRole('user'); setError(''); }}
-                  className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                  className={`p-4 rounded-2xl border text-left transition-all duration-200 relative flex flex-col justify-between ${
                     role === 'user'
-                      ? 'border-green-600 bg-green-50/60 ring-2 ring-green-600/20 shadow-sm'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'
+                      ? 'border-emerald-500 bg-gradient-to-b from-emerald-50/90 to-teal-50/30 ring-2 ring-emerald-500/20 shadow-md shadow-emerald-500/10'
+                      : 'border-gray-200/90 bg-white/70 hover:border-gray-300 hover:bg-gray-50/50 hover:shadow-sm'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`p-2 rounded-xl ${role === 'user' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                      <User size={20} />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`p-2.5 rounded-xl transition-all ${
+                      role === 'user'
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      <User size={19} />
                     </div>
-                    {role === 'user' && <CheckCircle2 size={18} className="text-green-600" />}
+                    {role === 'user' && (
+                      <span className="inline-flex items-center text-emerald-600 bg-emerald-100/90 rounded-full p-1">
+                        <CheckCircle2 size={15} />
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-sm">👤 User</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-snug">
-                      Donate items, schedule doorstep scrap pickup & track impact.
+                    <h3 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                      <span>Donor & Citizen</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Donate items, schedule doorstep scrap pickup & earn EcoPoints.
                     </p>
                   </div>
                 </button>
 
-                {/* 2. NGO */}
+                {/* 2. NGO Organization */}
                 <button
                   type="button"
                   onClick={() => { setRole('ngo'); setError(''); }}
-                  className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                  className={`p-4 rounded-2xl border text-left transition-all duration-200 relative flex flex-col justify-between ${
                     role === 'ngo'
-                      ? 'border-green-600 bg-green-50/60 ring-2 ring-green-600/20 shadow-sm'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'
+                      ? 'border-emerald-500 bg-gradient-to-b from-emerald-50/90 to-teal-50/30 ring-2 ring-emerald-500/20 shadow-md shadow-emerald-500/10'
+                      : 'border-gray-200/90 bg-white/70 hover:border-gray-300 hover:bg-gray-50/50 hover:shadow-sm'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`p-2 rounded-xl ${role === 'ngo' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                      <Building2 size={20} />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`p-2.5 rounded-xl transition-all ${
+                      role === 'ngo'
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      <Building2 size={19} />
                     </div>
-                    {role === 'ngo' && <CheckCircle2 size={18} className="text-green-600" />}
+                    {role === 'ngo' && (
+                      <span className="inline-flex items-center text-emerald-600 bg-emerald-100/90 rounded-full p-1">
+                        <CheckCircle2 size={15} />
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-sm">🏢 NGO</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-snug">
-                      Receive community donations, clothes, food & distribute aid.
+                    <h3 className="font-bold text-gray-900 text-sm">
+                      NGO / Non-Profit
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Receive verified items, food & clothes for community distribution.
                     </p>
                   </div>
                 </button>
@@ -313,66 +406,70 @@ const RegisterPage = () => {
                 <button
                   type="button"
                   onClick={() => { setRole('scrapdealer'); setError(''); }}
-                  className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                  className={`p-4 rounded-2xl border text-left transition-all duration-200 relative flex flex-col justify-between ${
                     role === 'scrapdealer'
-                      ? 'border-green-600 bg-green-50/60 ring-2 ring-green-600/20 shadow-sm'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'
+                      ? 'border-emerald-500 bg-gradient-to-b from-emerald-50/90 to-teal-50/30 ring-2 ring-emerald-500/20 shadow-md shadow-emerald-500/10'
+                      : 'border-gray-200/90 bg-white/70 hover:border-gray-300 hover:bg-gray-50/50 hover:shadow-sm'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`p-2 rounded-xl ${role === 'scrapdealer' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                      <Truck size={20} />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`p-2.5 rounded-xl transition-all ${
+                      role === 'scrapdealer'
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      <Truck size={19} />
                     </div>
-                    {role === 'scrapdealer' && <CheckCircle2 size={18} className="text-green-600" />}
+                    {role === 'scrapdealer' && (
+                      <span className="inline-flex items-center text-emerald-600 bg-emerald-100/90 rounded-full p-1">
+                        <CheckCircle2 size={15} />
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-sm">♻️ Scrap Dealer</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-snug">
-                      Receive recycling orders, collect materials & drive circular loop.
+                    <h3 className="font-bold text-gray-900 text-sm">
+                      Scrap Dealer
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Accept pickup orders, collect recyclable waste & trade materials.
                     </p>
                   </div>
                 </button>
               </div>
             </div>
 
-            {/* Role Header Banner */}
-            <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200/80 flex items-center justify-between text-xs text-gray-600">
-              <span className="font-medium">
-                Registering as: <strong className="text-gray-900 uppercase tracking-wide">{role === 'user' ? 'Individual User / Donor' : role === 'ngo' ? 'NGO / Organization' : 'Authorized Scrap Dealer'}</strong>
-              </span>
-            </div>
-
-            {/* Dynamic Form Sections */}
-
-            {/* SECTION A: General Personal / Contact Details */}
-            <div className="space-y-4">
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                {role === 'user' ? 'Personal Information' : 'Organization & Contact Details'}
-              </h2>
+            {/* SECTION 1: Personal Information Card */}
+            <div className="p-6 rounded-3xl bg-slate-50/60 border border-slate-200/70 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs">1</span>
+                <h2 className="text-xs font-black uppercase tracking-wider text-gray-700">
+                  Personal Information
+                </h2>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Full Name */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    {role === 'user' ? 'Full Name' : 'Administrator / Account Contact Name'} <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    {role === 'ngo' ? 'Representative Name' : role === 'scrapdealer' ? 'Owner Name' : 'Full Name'} <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
                     <input
                       type="text"
                       required
-                      placeholder={role === 'user' ? 'e.g. Rahul Sharma' : 'e.g. Suresh Patel'}
+                      placeholder="e.g. Rahul Sharma"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                      className="block w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     />
                   </div>
                 </div>
 
                 {/* Email Address */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Email Address <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Email Address <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -382,7 +479,7 @@ const RegisterPage = () => {
                       placeholder="e.g. rahul@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                      className="block w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     />
                   </div>
                 </div>
@@ -390,34 +487,37 @@ const RegisterPage = () => {
 
               {/* Phone Number */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Mobile Phone Number <span className="text-red-500">*</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Mobile Phone Number <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
                   <input
                     type="tel"
                     required
-                    placeholder="e.g. 9876543210"
+                    placeholder="e.g. 9876543210 (10 digits)"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                    className="block w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   />
                 </div>
               </div>
             </div>
 
-            {/* SECTION B: Role-Specific Verification Details */}
+            {/* SECTION 2: Role-Specific Verification Details (Conditional) */}
             {role === 'ngo' && (
-              <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/80 space-y-4">
-                <h2 className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 size={16} /> NGO Organization Details & Verification
-                </h2>
+              <div className="p-6 rounded-3xl bg-emerald-50/40 border border-emerald-200/80 space-y-4 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs">2</span>
+                  <h2 className="text-xs font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <Building2 size={15} /> NGO Verification & Accreditation
+                  </h2>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Official NGO Name <span className="text-red-500">*</span>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      Official NGO Name <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -425,13 +525,13 @@ const RegisterPage = () => {
                       placeholder="e.g. Green Earth Foundation"
                       value={ngoName}
                       onChange={(e) => setNgoName(e.target.value)}
-                      className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="block w-full px-3.5 py-3 bg-white border border-emerald-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Contact Person Name <span className="text-red-500">*</span>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      Contact Person Name <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -439,14 +539,14 @@ const RegisterPage = () => {
                       placeholder="e.g. Suresh Patel"
                       value={ngoContactPerson}
                       onChange={(e) => setNgoContactPerson(e.target.value)}
-                      className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="block w-full px-3.5 py-3 bg-white border border-emerald-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Registration / Trust / 80G Certificate Number <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Registration / Trust / 80G Certificate Number <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -454,38 +554,41 @@ const RegisterPage = () => {
                     placeholder="e.g. NGO-REG-2024-9843"
                     value={ngoRegNumber}
                     onChange={(e) => setNgoRegNumber(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono"
+                    className="block w-full px-3.5 py-3 bg-white border border-emerald-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
                   />
                   <p className="mt-1 text-[11px] text-gray-500">
-                    Administrator will verify this number before approving NGO application access.
+                    Administrator will verify this number before activating your NGO dashboard access.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Organization Mission / Description
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Organization Mission & Causes Supported
                   </label>
                   <textarea
                     rows={2}
                     placeholder="Briefly describe your NGO's social mission, causes supported, or community programs..."
                     value={ngoDescription}
                     onChange={(e) => setNgoDescription(e.target.value)}
-                    className="block w-full px-3.5 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                    className="block w-full px-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all resize-none"
                   />
                 </div>
               </div>
             )}
 
             {role === 'scrapdealer' && (
-              <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-200/80 space-y-4">
-                <h2 className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Truck size={16} /> Scrap Dealer Business & Verification Details
-                </h2>
+              <div className="p-6 rounded-3xl bg-purple-50/40 border border-purple-200/80 space-y-4 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white font-bold text-xs">2</span>
+                  <h2 className="text-xs font-black uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                    <Truck size={15} /> Scrap Business Accreditation
+                  </h2>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Dealer / Business Trade Name <span className="text-red-500">*</span>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      Business / Trade Name <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -493,13 +596,13 @@ const RegisterPage = () => {
                       placeholder="e.g. Eco Scrap Traders"
                       value={dealerBusinessName}
                       onChange={(e) => setDealerBusinessName(e.target.value)}
-                      className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="block w-full px-3.5 py-3 bg-white border border-purple-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Owner / Contact Person Name <span className="text-red-500">*</span>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      Owner / Contact Person <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -507,14 +610,14 @@ const RegisterPage = () => {
                       placeholder="e.g. Rajesh Kumar"
                       value={dealerContactPerson}
                       onChange={(e) => setDealerContactPerson(e.target.value)}
-                      className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="block w-full px-3.5 py-3 bg-white border border-purple-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Trade License / GST / Business Registration Number <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Trade License / GSTIN / Business Registration <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -522,16 +625,16 @@ const RegisterPage = () => {
                     placeholder="e.g. GSTIN27ABCDE1234F1Z5 or REG-7734"
                     value={dealerRegNumber}
                     onChange={(e) => setDealerRegNumber(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono"
+                    className="block w-full px-3.5 py-3 bg-white border border-purple-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all font-mono"
                   />
                   <p className="mt-1 text-[11px] text-gray-500">
-                    Administrator will review your business license before account activation.
+                    Administrator will verify your license credentials before approving pickup routing.
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-2">
-                    Accepted Recyclable Materials <span className="text-red-500">*</span>
+                    Accepted Recyclable Materials <span className="text-rose-500">*</span>
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {RECYCLING_CATEGORIES.map((cat) => {
@@ -556,14 +659,20 @@ const RegisterPage = () => {
               </div>
             )}
 
-            {/* SECTION C: Location & Address */}
-            <div className="space-y-4">
+            {/* SECTION 2/3: Address & Location Details Card */}
+            <div className="p-6 rounded-3xl bg-slate-50/60 border border-slate-200/70 space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  Address Details
-                </h2>
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs">
+                    {role === 'user' ? '2' : '3'}
+                  </span>
+                  <h2 className="text-xs font-black uppercase tracking-wider text-gray-700">
+                    Location & Logistics
+                  </h2>
+                </div>
+
                 <LiveLocationButton
-                  label="Detect My Location"
+                  label="Detect GPS Address"
                   color="green"
                   onLocationDetected={(data) => {
                     if (data.address) setAddress(data.address);
@@ -575,69 +684,74 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Street Address <span className="text-red-500">*</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Street Address / Locality <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 12 MG Road, Flat 4B"
+                    placeholder="e.g. Flat 4B, Green Towers, 12 MG Road"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                    className="block w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">City</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">City</label>
                   <input
                     type="text"
                     placeholder="e.g. Mumbai"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                    className="block w-full px-3.5 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">State</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">State</label>
                   <input
                     type="text"
                     placeholder="e.g. Maharashtra"
                     value={state}
                     onChange={(e) => setState(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                    className="block w-full px-3.5 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Pincode</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Pincode</label>
                   <input
                     type="text"
                     placeholder="e.g. 400001"
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                    className="block w-full px-3.5 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
                   />
                 </div>
               </div>
             </div>
 
-            {/* SECTION D: Password Creation */}
-            <div className="space-y-4">
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Account Security
-              </h2>
+            {/* SECTION 3/4: Account Security & Credentials Card */}
+            <div className="p-6 rounded-3xl bg-slate-50/60 border border-slate-200/70 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs">
+                  {role === 'user' ? '3' : '4'}
+                </span>
+                <h2 className="text-xs font-black uppercase tracking-wider text-gray-700">
+                  Account Security
+                </h2>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Create Password */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Create Password <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Create Password <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -647,22 +761,42 @@ const RegisterPage = () => {
                       placeholder="Minimum 6 characters"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                      className="block w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+
+                  {/* Password strength meter */}
+                  {password && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-500">Security strength:</span>
+                        <span className="font-bold text-emerald-700">{strengthLabels[passwordStrength]}</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                        {[1, 2, 3, 4].map((step) => (
+                          <div
+                            key={step}
+                            className={`h-full transition-all duration-300 ${
+                              passwordStrength >= step ? strengthColors[passwordStrength] : 'bg-transparent'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Confirm Password */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Confirm Password <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Confirm Password <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -672,12 +806,12 @@ const RegisterPage = () => {
                       placeholder="Re-enter password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl text-sm shadow-xs focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                      className="block w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 shadow-2xs focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
                     >
                       {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -690,8 +824,8 @@ const RegisterPage = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 border border-transparent rounded-2xl shadow-sm text-sm font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all disabled:opacity-50 active:scale-[0.99]"
+                disabled={isSubmitting || isGoogleSubmitting}
+                className="w-full py-4 px-6 border border-transparent rounded-2xl shadow-lg shadow-emerald-600/25 text-base font-bold text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
@@ -700,65 +834,33 @@ const RegisterPage = () => {
                   </>
                 ) : (
                   <>
-                    <span>Create Account</span>
-                    <ArrowRight size={17} />
+                    <span>Create Account & Join Platform</span>
+                    <ArrowRight size={18} />
                   </>
                 )}
               </button>
             </div>
 
-            {/* Divider */}
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-3 text-gray-400 font-medium tracking-wider">Or register instantly with</span>
-              </div>
+            {/* Trust and Security Strip */}
+            <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-600" /> 256-Bit SSL Encrypted
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5">
+                <Leaf size={14} className="text-emerald-600" /> Circular Waste Network
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-emerald-600" /> Instant Activation
+              </span>
             </div>
-
-            {/* Google Sign In Button */}
-            <button
-              type="button"
-              onClick={handleGoogleRegister}
-              disabled={isSubmitting || isGoogleSubmitting}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-200 rounded-2xl shadow-xs text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all disabled:opacity-50"
-            >
-              {isGoogleSubmitting ? (
-                <>
-                  <LoadingSpinner size="small" color="gray" />
-                  <span>Connecting to Google...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  <span>Sign up with Google</span>
-                </>
-              )}
-            </button>
 
             {/* Back to Login link */}
             <div className="text-center pt-2">
               <p className="text-xs text-gray-500">
                 Already registered with EcoDonate?{' '}
-                <Link to="/login" className="font-bold text-green-600 hover:text-green-700 underline underline-offset-2">
+                <Link to="/login" className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2">
                   Sign in here
                 </Link>
               </p>
@@ -779,7 +881,7 @@ const RegisterPage = () => {
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
                 Account Created & Active
               </div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
                 Welcome to EcoDonate!
               </h2>
               <p className="text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
@@ -787,31 +889,31 @@ const RegisterPage = () => {
               </p>
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-left space-y-2.5 text-xs text-gray-600">
+            <div className="bg-slate-50 border border-gray-200 rounded-3xl p-6 text-left space-y-3 text-xs text-gray-600 max-w-lg mx-auto">
               <p className="font-bold text-gray-800 uppercase tracking-wider text-[11px]">
                 Your account is ready to use:
               </p>
-              <ul className="space-y-2">
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
+              <ul className="space-y-2.5">
+                <li className="flex items-center gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-xs">✓</span>
                   <span>Donate clothes, books, and household goods to trusted NGOs</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
+                <li className="flex items-center gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-xs">✓</span>
                   <span>Schedule doorstep recycling pickups with verified scrap dealers</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
+                <li className="flex items-center gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-xs">✓</span>
                   <span>Earn EcoPoints and track your environmental contribution</span>
                 </li>
               </ul>
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}
-                className="py-3 px-6 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
               >
                 <span>Go to Dashboard</span>
                 <ArrowRight size={16} />
@@ -819,7 +921,7 @@ const RegisterPage = () => {
               <button
                 type="button"
                 onClick={() => navigate('/')}
-                className="py-3 px-6 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-2xl font-semibold text-sm transition-all"
+                className="w-full py-3.5 px-6 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-2xl font-semibold text-sm transition-all"
               >
                 Return to Home
               </button>
@@ -840,7 +942,7 @@ const RegisterPage = () => {
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
                 Status: Pending Admin Approval
               </div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
                 Registration Submitted Successfully!
               </h2>
               <p className="text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
@@ -848,31 +950,31 @@ const RegisterPage = () => {
               </p>
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-left space-y-3">
+            <div className="bg-slate-50 border border-gray-200 rounded-3xl p-6 text-left space-y-3 max-w-lg mx-auto">
               <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
                 What happens next?
               </h4>
-              <ul className="text-xs text-gray-600 space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center text-[10px]">1</span>
+              <ul className="text-xs text-gray-600 space-y-2.5">
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-[10px]">1</span>
                   <span>Our platform administrator will review your <strong>{role.toUpperCase()}</strong> registration details and license credentials.</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center text-[10px]">2</span>
-                  <span>Once verified, your account status will transition to <strong className="text-green-700">APPROVED</strong>.</span>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-[10px]">2</span>
+                  <span>Once verified, your account status will transition to <strong className="text-emerald-700">APPROVED</strong>.</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center text-[10px]">3</span>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-[10px]">3</span>
                   <span>You can then log in with your email and password to access the organization dashboard.</span>
                 </li>
               </ul>
             </div>
 
-            <div className="pt-3 flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="pt-3 flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
               <button
                 type="button"
                 onClick={() => navigate(`/login?email=${encodeURIComponent(email)}`)}
-                className="py-3 px-6 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
               >
                 <span>Continue to Sign In Page</span>
                 <ArrowRight size={16} />
@@ -880,7 +982,7 @@ const RegisterPage = () => {
               <button
                 type="button"
                 onClick={() => navigate('/')}
-                className="py-3 px-6 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-2xl font-semibold text-sm transition-all"
+                className="w-full py-3.5 px-6 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-2xl font-semibold text-sm transition-all"
               >
                 Return to Home
               </button>
