@@ -322,7 +322,7 @@ const forgotPasswordSendOtp = async (req, res, next) => {
 
     // Generate 6-digit reset code
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
 
     passwordResetStore.set(rawEmail, {
       otp,
@@ -330,21 +330,25 @@ const forgotPasswordSendOtp = async (req, res, next) => {
       attempts: 0
     });
 
-    await sendPasswordResetOtp(user.email, user.name, otp);
+    // Generate secure single-use password reset token (valid for 30 minutes)
+    const resetToken = jwt.sign(
+      { email: user.email, purpose: 'password_reset' },
+      JWT_SECRET,
+      { expiresIn: '30m' }
+    );
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
-    const hasSmtpConfig = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-    const isDev = process.env.NODE_ENV !== 'production' || !hasSmtpConfig;
+    // Dispatch professional email containing both 1-click link and 6-digit code
+    await sendPasswordResetOtp(user.email, user.name, otp, resetLink);
 
-    console.log(`[AUTH:FORGOT_PWD_SEND] Password reset OTP ${otp} sent to ${user.email}`);
+    console.log(`[AUTH:FORGOT_PWD_SEND] Password reset link & code dispatched for: ${user.email}`);
 
+    // Real-world security: Never leak secret code in client JSON response
     res.json({
       success: true,
-      message: hasSmtpConfig
-        ? `Password reset verification code has been sent to ${user.email}.`
-        : `Password reset verification code has been generated for ${user.email}.`,
-      email: user.email,
-      dev_otp: isDev ? otp : undefined,
-      dev_mode: isDev
+      message: `Password reset instructions have been sent to ${user.email}. Check your email inbox.`,
+      email: user.email
     });
   } catch (error) {
     console.error('[AUTH:FORGOT_PWD_SEND] Exception:', error.message);
@@ -387,11 +391,11 @@ const forgotPasswordVerifyOtp = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid verification code. Please check your email and try again.' });
     }
 
-    // OTP verified! Generate secure, single-use password reset session token (15 mins)
+    // OTP verified! Generate secure, single-use password reset session token (30 mins)
     const resetToken = jwt.sign(
       { email: rawEmail, purpose: 'password_reset' },
       JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '30m' }
     );
 
     res.json({
@@ -406,27 +410,60 @@ const forgotPasswordVerifyOtp = async (req, res, next) => {
 };
 
 // ============================================================================
+// 5b. FORGOT PASSWORD - VERIFY RESET TOKEN (For Email Direct Link)
+// ============================================================================
+const forgotPasswordVerifyToken = async (req, res, next) => {
+  try {
+    const token = (req.query.token || req.body.token || '').trim();
+    if (!token) {
+      return res.status(400).json({ valid: false, message: 'Reset token is required.' });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.purpose !== 'password_reset' || !decoded.email) {
+      return res.status(400).json({ valid: false, message: 'Invalid token purpose.' });
+    }
+
+    return res.json({ valid: true, email: decoded.email });
+  } catch (err) {
+    return res.status(400).json({
+      valid: false,
+      message: 'Password reset link is invalid or has expired. Please request a new one.'
+    });
+  }
+};
+
+// ============================================================================
 // 6. FORGOT PASSWORD - STEP 3: SET NEW PASSWORD
 // ============================================================================
 const forgotPasswordReset = async (req, res, next) => {
   try {
-    const rawEmail = (req.body.email || '').trim().toLowerCase();
-    const rawResetToken = req.body.resetToken || '';
+    const rawResetToken = (req.body.resetToken || req.body.token || '').trim();
     const rawNewPassword = req.body.newPassword || req.body.password || '';
     const rawConfirmPassword = req.body.confirmPassword || '';
 
-    if (!rawEmail || !rawResetToken || !rawNewPassword) {
-      return res.status(400).json({ message: 'Email, reset token, and new password are required.' });
+    if (!rawResetToken || !rawNewPassword) {
+      return res.status(400).json({ message: 'Reset token and new password are required.' });
     }
 
-    // Verify token
+    // Verify token & resolve email securely
+    let rawEmail = (req.body.email || '').trim().toLowerCase();
     try {
       const decoded = jwt.verify(rawResetToken, JWT_SECRET);
-      if (decoded.email !== rawEmail || decoded.purpose !== 'password_reset') {
-        return res.status(400).json({ message: 'Invalid or expired password reset session.' });
+      if (decoded.purpose !== 'password_reset') {
+        return res.status(400).json({ message: 'Invalid password reset token.' });
+      }
+      if (!rawEmail) {
+        rawEmail = (decoded.email || '').toLowerCase();
+      } else if (decoded.email.toLowerCase() !== rawEmail) {
+        return res.status(400).json({ message: 'Reset token does not match the specified email address.' });
       }
     } catch (err) {
-      return res.status(400).json({ message: 'Password reset session has expired. Please start over.' });
+      return res.status(400).json({ message: 'Password reset session has expired or is invalid. Please start over.' });
+    }
+
+    if (!rawEmail) {
+      return res.status(400).json({ message: 'Could not identify account email for password reset.' });
     }
 
     if (rawNewPassword.length < 6) {
@@ -910,6 +947,7 @@ module.exports = {
   resendRegistrationOtp,
   forgotPasswordSendOtp,
   forgotPasswordVerifyOtp,
+  forgotPasswordVerifyToken,
   forgotPasswordReset,
   login,
   googleLogin,

@@ -18,6 +18,7 @@ import ContactPage from './pages/public/ContactPage';
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
 // User Pages
 import UserDashboard from './pages/user/UserDashboard';
@@ -79,6 +80,7 @@ const App = () => {
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/unauthorized" element={<UnauthorizedPage />} />
             </Route>
 

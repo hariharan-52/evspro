@@ -8,6 +8,7 @@ const {
   resendRegistrationOtp,
   forgotPasswordSendOtp,
   forgotPasswordVerifyOtp,
+  forgotPasswordVerifyToken,
   forgotPasswordReset,
   login,
   googleLogin,
@@ -25,6 +26,8 @@ router.post('/resend-registration-otp', resendRegistrationOtp);
 // 2. Forgot Password Flow
 router.post('/forgot-password/send-otp', forgotPasswordSendOtp);
 router.post('/forgot-password/verify-otp', forgotPasswordVerifyOtp);
+router.get('/forgot-password/verify-token', forgotPasswordVerifyToken);
+router.post('/forgot-password/verify-token', forgotPasswordVerifyToken);
 router.post('/forgot-password/reset', forgotPasswordReset);
 
 // 3. Login

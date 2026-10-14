@@ -44,6 +44,11 @@ export const forgotPasswordVerifyOtp = async (email, otp) => {
   return response.data;
 };
 
+export const forgotPasswordVerifyToken = async (token) => {
+  const response = await api.get(`/auth/forgot-password/verify-token?token=${encodeURIComponent(token)}`);
+  return response.data;
+};
+
 export const forgotPasswordReset = async ({ email, resetToken, newPassword, confirmPassword }) => {
   const response = await api.post('/auth/forgot-password/reset', {
     email,

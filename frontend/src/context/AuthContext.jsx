@@ -8,6 +8,7 @@ import {
   resendRegistrationOtp as apiResendRegistrationOtp,
   forgotPasswordSendOtp as apiForgotPasswordSendOtp,
   forgotPasswordVerifyOtp as apiForgotPasswordVerifyOtp,
+  forgotPasswordVerifyToken as apiForgotPasswordVerifyToken,
   forgotPasswordReset as apiForgotPasswordReset,
   logout as apiLogout,
   syncSession
@@ -229,6 +230,15 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // 6b. Forgot Password: Verify Token (from link)
+  const forgotPasswordVerifyToken = useCallback(async (token) => {
+    try {
+      return await apiForgotPasswordVerifyToken(token);
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
   // 7. Forgot Password: Reset Password
   const forgotPasswordReset = useCallback(async (payload) => {
     try {
@@ -296,6 +306,7 @@ export const AuthProvider = ({ children }) => {
         resendRegistrationOtp,
         forgotPasswordSendOtp,
         forgotPasswordVerifyOtp,
+        forgotPasswordVerifyToken,
         forgotPasswordReset,
         logout,
         refreshUser,

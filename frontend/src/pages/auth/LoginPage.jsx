@@ -34,7 +34,6 @@ const LoginPage = () => {
   const [forgotStep, setForgotStep] = useState('email'); // 'email' | 'otp' | 'new_password' | 'success'
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
-  const [forgotDevOtp, setForgotDevOtp] = useState(null);
   const [forgotResetToken, setForgotResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -220,17 +219,62 @@ const LoginPage = () => {
     setForgotSubmitting(true);
     try {
       const res = await forgotPasswordSendOtp(cleanEmail);
-      toast.success(res.message || 'Password reset code sent!');
-      if (res?.dev_otp) setForgotDevOtp(res.dev_otp);
+      toast.success(res.message || 'Password reset instructions sent!');
       setForgotStep('otp');
       setForgotCooldown(30);
-      setForgotExpiresIn(600);
+      setForgotExpiresIn(900); // 15 mins
       setForgotOtp('');
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to send reset code. Please check your email.';
+      const msg = err.response?.data?.message || 'Failed to send reset instructions. Please check your email.';
       setForgotError(msg);
     } finally {
       setForgotSubmitting(false);
+    }
+  };
+
+  // Digits input management for realistic 6-box PIN entry
+  const handleDigitChange = (index, value) => {
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const chars = forgotOtp.split('');
+    chars[index] = digit;
+    const newOtp = chars.slice(0, 6).join('');
+    setForgotOtp(newOtp);
+
+    // Auto-focus next box
+    if (digit && index < 5) {
+      const nextInput = document.getElementById(`forgot-otp-box-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handleDigitKeyDown = (index, e) => {
+    if (e.key === 'Backspace') {
+      if (!forgotOtp[index] && index > 0) {
+        const prevInput = document.getElementById(`forgot-otp-box-${index - 1}`);
+        if (prevInput) {
+          prevInput.focus();
+          const chars = forgotOtp.split('');
+          chars[index - 1] = '';
+          setForgotOtp(chars.join(''));
+        }
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      const prevInput = document.getElementById(`forgot-otp-box-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      const nextInput = document.getElementById(`forgot-otp-box-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handleDigitPaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted) {
+      setForgotOtp(pasted);
+      const targetIndex = Math.min(pasted.length, 5);
+      const targetInput = document.getElementById(`forgot-otp-box-${targetIndex}`);
+      if (targetInput) targetInput.focus();
     }
   };
 
@@ -243,7 +287,7 @@ const LoginPage = () => {
 
     const cleanOtp = forgotOtp.trim();
     if (!cleanOtp || cleanOtp.length !== 6) {
-      setForgotError('Please enter the 6-digit code sent to your email.');
+      setForgotError('Please enter the full 6-digit verification code.');
       return;
     }
 
@@ -268,10 +312,9 @@ const LoginPage = () => {
     setForgotSubmitting(true);
     try {
       const res = await forgotPasswordSendOtp(forgotEmail.trim().toLowerCase());
-      toast.success(res.message || 'New reset code sent!');
-      if (res?.dev_otp) setForgotDevOtp(res.dev_otp);
+      toast.success(res.message || 'New verification code dispatched!');
       setForgotCooldown(30);
-      setForgotExpiresIn(600);
+      setForgotExpiresIn(900);
       setForgotOtp('');
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to resend code.';
@@ -631,56 +674,48 @@ const LoginPage = () => {
 
               {/* STEP 2: ENTER OTP */}
               {forgotStep === 'otp' && (
-                <form onSubmit={handleForgotVerifyOtp} className="space-y-4">
+                <form onSubmit={handleForgotVerifyOtp} className="space-y-5">
                   <div className="text-center">
-                    <p className="text-xs text-gray-500">
-                      Enter the 6-digit verification code sent to:
-                    </p>
-                    <p className="text-xs font-bold text-gray-900 mt-0.5">{forgotEmail}</p>
-                  </div>
-
-                  {/* Dev Mode Code Helper */}
-                  {forgotDevOtp && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-left space-y-1.5 animate-fadeIn">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-                          Dev / Demo Reset Code
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForgotOtp(forgotDevOtp);
-                            toast.success('Code copied!');
-                          }}
-                          className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-lg transition-all shadow-xs"
-                        >
-                          Auto-Fill
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-base font-black tracking-[4px] text-emerald-950 bg-white border border-emerald-300 py-1 px-3 rounded-lg font-mono">
-                          {forgotDevOtp}
-                        </span>
-                        <span className="text-[10px] text-emerald-600">(Printed in terminal)</span>
-                      </div>
+                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2.5 shadow-xs">
+                      <Mail size={22} className="animate-pulse" />
                     </div>
-                  )}
-
-                  <div className="flex justify-center">
-                    <input
-                      type="text"
-                      required
-                      maxLength={6}
-                      autoFocus
-                      placeholder="••••••"
-                      value={forgotOtp}
-                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
-                      className="w-48 text-center text-xl font-bold tracking-[6px] py-2.5 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono"
-                    />
+                    <h4 className="text-sm font-bold text-gray-900">Check Your Email</h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      We sent a 6-digit verification code and secure reset link to:
+                    </p>
+                    <p className="text-xs font-bold text-emerald-700 bg-emerald-50 inline-block px-3 py-1 rounded-lg mt-1 border border-emerald-200/60 font-mono">
+                      {forgotEmail}
+                    </p>
                   </div>
 
+                  {/* Modern 6-Box PIN Code Input */}
+                  <div className="space-y-2">
+                    <label className="block text-center text-xs font-bold text-gray-700">
+                      Enter 6-Digit Code
+                    </label>
+                    <div className="flex justify-center gap-2">
+                      {[0, 1, 2, 3, 4, 5].map((index) => (
+                        <input
+                          key={index}
+                          id={`forgot-otp-box-${index}`}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={forgotOtp[index] || ''}
+                          onChange={(e) => handleDigitChange(index, e.target.value)}
+                          onKeyDown={(e) => handleDigitKeyDown(index, e)}
+                          onPaste={handleDigitPaste}
+                          autoFocus={index === 0}
+                          className="w-11 h-12 text-center text-lg font-black text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-xl focus:bg-white focus:border-green-600 focus:ring-2 focus:ring-green-500/20 outline-none transition-all font-mono"
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Expiration and Resend Timer */}
                   <div className="flex items-center justify-between text-xs bg-gray-50 p-3 rounded-xl border border-gray-200">
-                    <span className="text-gray-500 flex items-center gap-1">
+                    <span className="text-gray-500 flex items-center gap-1.5">
                       <Clock size={13} className="text-amber-500" />
                       Expires in: <strong className="font-mono text-gray-800">{formatTimer(forgotExpiresIn)}</strong>
                     </span>
@@ -689,17 +724,21 @@ const LoginPage = () => {
                       type="button"
                       disabled={forgotCooldown > 0 || forgotSubmitting}
                       onClick={handleForgotResendOtp}
-                      className="font-bold text-green-600 hover:text-green-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
+                      className="font-bold text-green-600 hover:text-green-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
                     >
                       <RefreshCw size={12} className={forgotSubmitting ? 'animate-spin' : ''} />
                       <span>{forgotCooldown > 0 ? `Resend in ${forgotCooldown}s` : 'Resend Code'}</span>
                     </button>
                   </div>
 
+                  <p className="text-[11px] text-gray-400 text-center leading-relaxed">
+                    Didn't receive the email? Check your spam folder or click the direct reset link sent to your inbox.
+                  </p>
+
                   <button
                     type="submit"
                     disabled={forgotSubmitting || forgotOtp.length !== 6}
-                    className="w-full py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-sm shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
                   >
                     {forgotSubmitting ? (
                       <>
@@ -709,7 +748,7 @@ const LoginPage = () => {
                     ) : (
                       <>
                         <ShieldCheck size={16} />
-                        <span>Verify Code</span>
+                        <span>Verify Code & Continue</span>
                       </>
                     )}
                   </button>
