@@ -46,10 +46,18 @@ const Sidebar = ({ open, setOpen }) => {
           { name: 'Donations', path: '/admin/donations', icon: <Heart size={20} /> },
           { name: 'Recycling', path: '/admin/recycling', icon: <Recycle size={20} /> },
           { name: 'Reports', path: '/admin/reports', icon: <FileText size={20} /> },
+          { name: 'Profile', path: '/admin/profile', icon: <User size={20} /> },
         ];
       default:
         return [];
     }
+  };
+
+  const getProfilePath = () => {
+    if (user?.role === 'ngo') return '/ngo/profile';
+    if (user?.role === 'scrapdealer') return '/dealer/profile';
+    if (user?.role === 'admin') return '/admin/profile';
+    return '/profile';
   };
 
   const navItems = getNavItems();
@@ -69,7 +77,11 @@ const Sidebar = ({ open, setOpen }) => {
         <div className="flex flex-col h-full">
           {/* User Info Header */}
           <div className="p-6 border-b border-green-700 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <NavLink 
+              to={getProfilePath()} 
+              className="flex items-center gap-3 hover:opacity-90 transition-opacity"
+              title="View & Edit Profile"
+            >
               <img 
                 src={generateAvatarUrl(user?.name)} 
                 alt="Avatar" 
@@ -79,7 +91,7 @@ const Sidebar = ({ open, setOpen }) => {
                 <span className="font-semibold truncate">{user?.name}</span>
                 <span className="text-xs text-green-300 capitalize">{user?.role}</span>
               </div>
-            </div>
+            </NavLink>
             <button onClick={() => setOpen(false)} className="lg:hidden text-green-300 hover:text-white focus:outline-none">
               <X size={20} />
             </button>

@@ -11,3 +11,4 @@ backend/uploads/*
 *.log
 .DS_Store
 .vercel
+*.timestamp-*.mjs

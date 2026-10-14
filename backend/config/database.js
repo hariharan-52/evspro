@@ -207,6 +207,14 @@ async function initMySQLTables(pool) {
       )
     `);
 
+    // Ensure image columns are LONGTEXT in case tables were originally created with VARCHAR(255)
+    try {
+      await pool.query('ALTER TABLE donations MODIFY COLUMN image LONGTEXT');
+    } catch (e) {}
+    try {
+      await pool.query('ALTER TABLE recycling_requests MODIFY COLUMN image LONGTEXT');
+    } catch (e) {}
+
     // 2. Seed initial demo accounts if database is fresh
     const [rows] = await pool.query('SELECT COUNT(*) as c FROM users');
     const count = rows[0]?.c || 0;

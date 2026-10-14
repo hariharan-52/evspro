@@ -26,17 +26,33 @@ const DonatePage = () => {
   });
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleImageSelect = (file, dataUrl) => {
-    setFormData({ ...formData, image: dataUrl || file });
+    const chosen = dataUrl || file;
+    setFormData(prev => ({ ...prev, image: chosen }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.image) {
+      toast.error('Please attach a photo of the item you wish to donate');
+      return;
+    }
     setLoading(true);
     try {
+      let imageData = formData.image;
+      if (imageData instanceof File) {
+        imageData = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(imageData);
+        });
+      }
+
       const payload = {
         item_name: formData.itemName,
         category: formData.category,
@@ -48,21 +64,11 @@ const DonatePage = () => {
         pincode: formData.pincode,
         pickup_date: formData.pickupDate || null,
         additional_notes: formData.notes || null,
-        image: typeof formData.image === 'string' ? formData.image : undefined
+        image: imageData || null,
+        image_url: imageData || null
       };
 
-      if (formData.image instanceof File) {
-        const data = new FormData();
-        Object.entries(payload).forEach(([k, v]) => {
-          if (v !== null && v !== undefined) data.append(k, v);
-        });
-        data.append('image', formData.image);
-        await api.post('/donations', data, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } else {
-        await api.post('/donations', payload);
-      }
+      await api.post('/donations', payload);
 
       toast.success('Donation request created successfully!');
       navigate('/my-requests');
@@ -91,6 +97,7 @@ const DonatePage = () => {
                 <ImageUpload 
                   onImageSelect={handleImageSelect} 
                   label="Item Photo (Required)" 
+                  required
                 />
               </div>
               

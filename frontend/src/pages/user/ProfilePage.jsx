@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useAuth from '../../hooks/useAuth';
 import { generateAvatarUrl } from '../../utils/helpers';
 import { toast } from 'react-hot-toast';
@@ -35,7 +35,8 @@ const ProfilePage = () => {
   }, [user]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async (e) => {

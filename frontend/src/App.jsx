@@ -53,6 +53,16 @@ import AdminReportsPage from './pages/admin/AdminReportsPage';
 // Other
 import NotFoundPage from './pages/NotFoundPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
+import useAuth from './hooks/useAuth';
+
+// Dispatches to the appropriate profile view based on logged-in user role
+const ProfileDispatcher = () => {
+  const { user } = useAuth();
+  if (user?.role === 'ngo') return <Navigate to="/ngo/profile" replace />;
+  if (user?.role === 'scrapdealer') return <Navigate to="/dealer/profile" replace />;
+  if (user?.role === 'admin') return <Navigate to="/admin/profile" replace />;
+  return <ProfilePage />;
+};
 
 const App = () => {
   return (
@@ -72,6 +82,13 @@ const App = () => {
               <Route path="/unauthorized" element={<UnauthorizedPage />} />
             </Route>
 
+            {/* Unified Profile Route (Accessible by any logged-in user) */}
+            <Route element={<PrivateRoute />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/profile" element={<ProfileDispatcher />} />
+              </Route>
+            </Route>
+
             {/* User Dashboard */}
             <Route element={<PrivateRoute role="user" />}>
               <Route element={<DashboardLayout />}>
@@ -80,7 +97,6 @@ const App = () => {
                 <Route path="/recycle" element={<RecyclePage />} />
                 <Route path="/my-requests" element={<MyRequestsPage />} />
                 <Route path="/impact" element={<ImpactPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
               </Route>
             </Route>
 
@@ -116,6 +132,7 @@ const App = () => {
                 <Route path="/admin/donations" element={<AdminDonationsPage />} />
                 <Route path="/admin/recycling" element={<AdminRecyclingPage />} />
                 <Route path="/admin/reports" element={<AdminReportsPage />} />
+                <Route path="/admin/profile" element={<ProfilePage />} />
               </Route>
             </Route>
 

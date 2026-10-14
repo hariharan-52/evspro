@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// Client-side image compressor: keeps image quality crisp while keeping payload lightweight (<200KB)
-const compressImage = (file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) => {
+// Client-side image compressor: keeps image quality crisp while keeping payload lightweight (<100KB)
+const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.72) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -30,18 +30,14 @@ const compressImage = (file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) 
         ctx.drawImage(img, 0, 0, width, height);
 
         let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        // If still > 350KB, compress with slightly lower quality
-        if (dataUrl.length > 350 * 1024) {
-          dataUrl = canvas.toDataURL('image/jpeg', 0.60);
+        if (dataUrl.length > 250 * 1024) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.55);
         }
         resolve(dataUrl);
       };
       img.onerror = () => {
-        if (file.size > 2 * 1024 * 1024) {
-          reject(new Error('Image is too large to process. Please select a smaller photo.'));
-        } else {
-          resolve(event.target.result);
-        }
+        // Fallback to full data URL directly if canvas decoding fails
+        resolve(event.target.result);
       };
     };
     reader.onerror = (err) => reject(err);
@@ -121,8 +117,8 @@ const ImageUpload = ({
       toast.error('Please upload an image file (JPEG, PNG, WEBP, etc)');
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error('Image size must be less than 8MB');
+    if (file.size > 16 * 1024 * 1024) {
+      toast.error('Image size must be less than 16MB');
       return;
     }
 
@@ -133,17 +129,13 @@ const ImageUpload = ({
       setSourceType('file');
       if (onImageSelect) onImageSelect(file, compressedDataUrl);
     } catch (err) {
-      if (file.size <= 1.5 * 1024 * 1024) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setPreview(reader.result);
-          setSourceType('file');
-          if (onImageSelect) onImageSelect(file, reader.result);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        toast.error(err.message || 'Image is too large. Please select a smaller photo.');
-      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result);
+        setSourceType('file');
+        if (onImageSelect) onImageSelect(file, reader.result);
+      };
+      reader.readAsDataURL(file);
     } finally {
       setProcessing(false);
     }
