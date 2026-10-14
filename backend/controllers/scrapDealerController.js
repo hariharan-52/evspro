@@ -1,8 +1,12 @@
 const { pool } = require('../config/database');
 const UserRegistry = require('../data/userRegistry');
+const { saveUserToFirestore } = require('../services/firestoreService');
 
 const getScrapDealers = async (req, res, next) => {
   try {
+    // Ensure persistent user registry is synced to SQL before query
+    await UserRegistry.syncToDatabase(pool).catch(() => {});
+
     let query = 'SELECT s.*, u.name, u.email, u.phone, u.city, u.address, u.state, u.pincode, u.status as user_status FROM scrap_dealers s JOIN users u ON s.user_id = u.id';
     if (req.user && req.user.role !== 'admin') {
       query += ' WHERE s.verification_status = "approved"';
@@ -28,18 +32,42 @@ const getScrapDealerById = async (req, res, next) => {
 const verifyScrapDealer = async (req, res, next) => {
   try {
     const { status, reason } = req.body;
-    const [dealer] = await pool.query('SELECT user_id, business_name FROM scrap_dealers WHERE id = ?', [req.params.id]);
-    if (dealer.length === 0) return res.status(404).json({ message: 'Scrap Dealer not found' });
+    let [dealer] = await pool.query('SELECT id, user_id, business_name FROM scrap_dealers WHERE id = ?', [req.params.id]);
+    if (!dealer || dealer.length === 0) {
+      [dealer] = await pool.query('SELECT id, user_id, business_name FROM scrap_dealers WHERE user_id = ?', [req.params.id]);
+    }
+    if (!dealer || dealer.length === 0) return res.status(404).json({ message: 'Scrap Dealer not found' });
 
     const newVerificationStatus = status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending';
     const userStatus = newVerificationStatus === 'approved' ? 'active' : newVerificationStatus === 'rejected' ? 'rejected' : 'pending';
 
-    await pool.query('UPDATE scrap_dealers SET verification_status = ?, rejection_reason = ? WHERE id = ?', [newVerificationStatus, reason || null, req.params.id]);
+    // Update in scrap_dealers table
+    await pool.query('UPDATE scrap_dealers SET verification_status = ?, rejection_reason = ? WHERE id = ?', [newVerificationStatus, reason || null, dealer[0].id]);
+    await pool.query('UPDATE scrap_dealers SET verification_status = ?, rejection_reason = ? WHERE user_id = ?', [newVerificationStatus, reason || null, dealer[0].user_id]);
+
+    // Update in users table
     await pool.query('UPDATE users SET status = ? WHERE id = ?', [userStatus, dealer[0].user_id]);
     if (userStatus === 'active') {
       await pool.query('UPDATE users SET is_email_verified = 1 WHERE id = ?', [dealer[0].user_id]);
     }
-    UserRegistry.updateUserStatus(dealer[0].user_id, userStatus);
+
+    // Update in persistent registry
+    const updatedUser = UserRegistry.updateUserStatus(dealer[0].user_id, userStatus);
+
+    // Persist status change to Cloud Firestore so it survives serverless cold starts
+    try {
+      const [userRows] = await pool.query('SELECT * FROM users WHERE id = ?', [dealer[0].user_id]);
+      const userObj = userRows?.[0] || updatedUser || UserRegistry.findUser(dealer[0].user_id);
+      if (userObj) {
+        userObj.status = userStatus;
+        if (userObj.scrap_dealer_details) {
+          userObj.scrap_dealer_details.verification_status = newVerificationStatus;
+        }
+        await saveUserToFirestore(userObj);
+      }
+    } catch (fsErr) {
+      console.warn('[DEALER:VERIFY] Firestore update note:', fsErr.message);
+    }
 
     const notifTitle = newVerificationStatus === 'approved' ? 'Scrap Dealer Registration Approved' : 'Scrap Dealer Registration Rejected';
     const notifMsg = newVerificationStatus === 'approved'

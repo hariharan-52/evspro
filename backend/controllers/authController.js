@@ -152,8 +152,9 @@ const registerRequest = async (req, res, next) => {
     // 4. Securely hash password
     const passwordHash = await bcrypt.hash(rawPassword, 10);
 
-    // 5. Initial status: All accounts are immediately active and usable
-    const initialStatus = 'active';
+    // 5. Initial status: NGOs and Scrap Dealers require Admin approval; Donors/Users are immediately active
+    const initialStatus = rawRole === 'user' ? 'active' : 'pending';
+    const initialVerificationStatus = rawRole === 'user' ? 'approved' : 'pending';
 
     // 6. Direct Database Insert
     let dbUserId = null;
@@ -162,7 +163,7 @@ const registerRequest = async (req, res, next) => {
         'INSERT INTO users (name, email, phone, password_hash, role, address, city, state, pincode, status, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
         [rawName, rawEmail, rawPhone, passwordHash, rawRole, rawAddress, rawCity, rawState, rawPincode, initialStatus]
       );
-      dbUserId = insertRes.insertId;
+      dbUserId = insertRes?.insertId || null;
     } catch (dbErr) {
       console.error('[AUTH:REGISTER] DB insert error:', dbErr.message);
     }
@@ -172,7 +173,7 @@ const registerRequest = async (req, res, next) => {
       try {
         await pool.query(
           'INSERT INTO ngos (user_id, ngo_name, contact_person, registration_number, description, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-          [dbUserId, ngoDetails.ngo_name, ngoDetails.contact_person, ngoDetails.registration_number, ngoDetails.description, 'approved']
+          [dbUserId, ngoDetails.ngo_name, ngoDetails.contact_person, ngoDetails.registration_number, ngoDetails.description, 'pending']
         );
       } catch (e) {
         console.error('[AUTH:REGISTER] NGO details insert error:', e.message);
@@ -181,7 +182,7 @@ const registerRequest = async (req, res, next) => {
       try {
         await pool.query(
           'INSERT INTO scrap_dealers (user_id, business_name, contact_person, registration_number, accepted_materials, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-          [dbUserId, scrapDealerDetails.business_name, scrapDealerDetails.contact_person, scrapDealerDetails.registration_number, typeof scrapDealerDetails.accepted_materials === 'string' ? scrapDealerDetails.accepted_materials : JSON.stringify(scrapDealerDetails.accepted_materials || []), 'approved']
+          [dbUserId, scrapDealerDetails.business_name, scrapDealerDetails.contact_person, scrapDealerDetails.registration_number, typeof scrapDealerDetails.accepted_materials === 'string' ? scrapDealerDetails.accepted_materials : JSON.stringify(scrapDealerDetails.accepted_materials || []), 'pending']
         );
       } catch (e) {
         console.error('[AUTH:REGISTER] Scrap dealer details insert error:', e.message);
@@ -202,8 +203,8 @@ const registerRequest = async (req, res, next) => {
       pincode: rawPincode,
       status: initialStatus,
       is_email_verified: 1,
-      ngo_details: ngoDetails,
-      scrap_dealer_details: scrapDealerDetails
+      ngo_details: ngoDetails ? { ...ngoDetails, verification_status: initialVerificationStatus } : undefined,
+      scrap_dealer_details: scrapDealerDetails ? { ...scrapDealerDetails, verification_status: initialVerificationStatus } : undefined
     });
 
     // Sync database and persistent registry
@@ -220,8 +221,8 @@ const registerRequest = async (req, res, next) => {
         state: rawState,
         pincode: rawPincode,
         status: initialStatus,
-        ngo_details: ngoDetails,
-        scrap_dealer_details: scrapDealerDetails
+        ngo_details: ngoDetails ? { ...ngoDetails, verification_status: initialVerificationStatus } : undefined,
+        scrap_dealer_details: scrapDealerDetails ? { ...scrapDealerDetails, verification_status: initialVerificationStatus } : undefined
       };
       await firebaseSignUp(rawEmail, rawPassword, cloudProfile);
       console.log(`[AUTH:REGISTER] User permanently registered in Firebase Cloud Auth: ${rawEmail}`);
@@ -233,7 +234,8 @@ const registerRequest = async (req, res, next) => {
     try {
       await saveUserToFirestore({
         ...savedUser,
-        password_hash: passwordHash
+        password_hash: passwordHash,
+        status: initialStatus
       });
       console.log(`[AUTH:REGISTER] User permanently backed up to Cloud Firestore: ${rawEmail}`);
     } catch (fsErr) {
@@ -242,7 +244,26 @@ const registerRequest = async (req, res, next) => {
 
     console.log(`[AUTH:REGISTER] User registered successfully: ${rawEmail} (${rawRole}, status: ${initialStatus})`);
 
-    // 9. Generate token and return clean response for all roles
+    // 9. Response handling:
+    // If account is pending approval (NGO or Scrap Dealer), do NOT generate a JWT session token.
+    if (initialStatus === 'pending') {
+      return res.status(201).json({
+        success: true,
+        role: rawRole,
+        status: 'pending',
+        user: {
+          id: savedUser.id,
+          name: savedUser.name,
+          email: savedUser.email,
+          phone: savedUser.phone,
+          role: savedUser.role,
+          status: 'pending'
+        },
+        message: 'Your registration has been submitted successfully and is pending administrator review and approval. You will be able to log in once an administrator approves your application.'
+      });
+    }
+
+    // Regular users (donors) receive an active session token immediately
     const token = generateToken(savedUser);
     return res.status(201).json({
       success: true,
@@ -546,7 +567,7 @@ const login = async (req, res, next) => {
           city: sourceData.city || '',
           state: sourceData.state || '',
           pincode: sourceData.pincode || '',
-          status: sourceData.status || 'active',
+          status: sourceData.status || (sourceData.role === 'user' ? 'active' : 'pending'),
           is_email_verified: 1,
           ngo_details: sourceData.ngo_details || null,
           scrap_dealer_details: sourceData.scrap_dealer_details || null
@@ -561,14 +582,16 @@ const login = async (req, res, next) => {
           );
 
           if (user.role === 'ngo' && user.ngo_details) {
+            const verStatus = user.status === 'active' ? 'approved' : (user.status === 'rejected' ? 'rejected' : 'pending');
             await pool.query(
               'INSERT INTO ngos (user_id, ngo_name, contact_person, registration_number, description, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-              [user.id, user.ngo_details.ngo_name || user.name, user.ngo_details.contact_person || user.name, user.ngo_details.registration_number || '', user.ngo_details.description || '', 'approved']
+              [user.id, user.ngo_details.ngo_name || user.name, user.ngo_details.contact_person || user.name, user.ngo_details.registration_number || '', user.ngo_details.description || '', verStatus]
             );
           } else if (user.role === 'scrapdealer' && user.scrap_dealer_details) {
+            const verStatus = user.status === 'active' ? 'approved' : (user.status === 'rejected' ? 'rejected' : 'pending');
             await pool.query(
               'INSERT INTO scrap_dealers (user_id, business_name, contact_person, registration_number, accepted_materials, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-              [user.id, user.scrap_dealer_details.business_name || user.name, user.scrap_dealer_details.contact_person || user.name, user.scrap_dealer_details.registration_number || '', typeof user.scrap_dealer_details.accepted_materials === 'string' ? user.scrap_dealer_details.accepted_materials : JSON.stringify(user.scrap_dealer_details.accepted_materials || []), 'approved']
+              [user.id, user.scrap_dealer_details.business_name || user.name, user.scrap_dealer_details.contact_person || user.name, user.scrap_dealer_details.registration_number || '', typeof user.scrap_dealer_details.accepted_materials === 'string' ? user.scrap_dealer_details.accepted_materials : JSON.stringify(user.scrap_dealer_details.accepted_materials || []), verStatus]
             );
           }
         } catch (dbErr) {
@@ -775,7 +798,14 @@ const googleLogin = async (req, res, next) => {
       UserRegistry.syncToDatabase(pool).catch(() => {});
     }
 
-    // Check account status if deactivated
+    // Check account status if pending or deactivated
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        message: 'Your account is awaiting Admin approval. Our administrator will review your application and approve access.',
+        code: 'ACCOUNT_PENDING'
+      });
+    }
+
     if (user.status === 'rejected' || user.status === 'inactive') {
       return res.status(403).json({
         message: 'Your account access has been restricted by the administrator.',

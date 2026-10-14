@@ -143,7 +143,7 @@
     "city": "Delhi",
     "state": "Delhi",
     "pincode": "110020",
-    "status": "active",
+    "status": "pending",
     "ngo_details": {
       "ngo_name": "Hope Foundation",
       "contact_person": "Meera Reddy",
@@ -165,7 +165,7 @@
     "city": "Bangalore",
     "state": "Karnataka",
     "pincode": "560022",
-    "status": "active",
+    "status": "pending",
     "scrap_dealer_details": {
       "contact_person": "Vinod Desai",
       "business_name": "City Recyclers",

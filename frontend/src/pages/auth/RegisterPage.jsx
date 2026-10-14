@@ -65,9 +65,9 @@ const RegisterPage = () => {
   const { registerRequest, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated with an active account
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && user.status !== 'pending') {
       if (user.role === 'admin') navigate('/admin/dashboard', { replace: true });
       else if (user.role === 'ngo') navigate('/ngo/dashboard', { replace: true });
       else if (user.role === 'scrapdealer') navigate('/dealer/dashboard', { replace: true });
@@ -200,9 +200,13 @@ const RegisterPage = () => {
       }
 
       const res = await registerRequest(payload);
-      toast.success(res.message || 'Account registered successfully!');
+      toast.success(res?.message || 'Account registered successfully!');
 
-      setCurrentStep('success');
+      if (role === 'ngo' || role === 'scrapdealer' || res?.status === 'pending') {
+        setCurrentStep('pending');
+      } else {
+        setCurrentStep('success');
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to submit registration. Please try again.';
       setError(msg);

@@ -1,7 +1,9 @@
 const { pool } = require('../config/database');
+const UserRegistry = require('../data/userRegistry');
 
 const getDashboardStats = async (req, res, next) => {
   try {
+    await UserRegistry.syncToDatabase(pool).catch(() => {});
     const [[users]] = await pool.query('SELECT COUNT(*) as c FROM users WHERE role="user"');
     const [[ngos]] = await pool.query('SELECT COUNT(*) as c FROM ngos');
     const [[dealers]] = await pool.query('SELECT COUNT(*) as c FROM scrap_dealers');
@@ -114,6 +116,7 @@ const getUserRoleStats = async (req, res, next) => {
 
 const getPendingVerifications = async (req, res, next) => {
   try {
+    await UserRegistry.syncToDatabase(pool).catch(() => {});
     const [ngos] = await pool.query(`
       SELECT n.*, u.name as user_name, u.email, u.phone, u.city, u.address, u.state, u.pincode, u.status as user_status
       FROM ngos n 

@@ -173,11 +173,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // 2. Direct Registration (Auto-authenticates active users of ALL roles so refresh preserves session)
+  // 2. Direct Registration (Auto-authenticates active users; pending NGO/dealer accounts wait for admin approval)
   const registerRequest = useCallback(async (formData) => {
     try {
       const res = await apiRegisterRequest(formData);
-      if (res && res.token && res.user) {
+      if (res && res.token && res.user && res.status !== 'pending') {
         saveAuthSession(res.token, res.user);
 
         // Also sign in to client-side Firebase Auth if password available

@@ -1,8 +1,12 @@
 const { pool } = require('../config/database');
 const UserRegistry = require('../data/userRegistry');
+const { saveUserToFirestore } = require('../services/firestoreService');
 
 const getNGOs = async (req, res, next) => {
   try {
+    // Ensure persistent user registry is synced to SQL before query
+    await UserRegistry.syncToDatabase(pool).catch(() => {});
+
     let query = 'SELECT n.*, u.name, u.email, u.phone, u.city, u.address, u.state, u.pincode, u.status as user_status FROM ngos n JOIN users u ON n.user_id = u.id';
     if (req.user && req.user.role !== 'admin') {
       query += ' WHERE n.verification_status = "approved"';
@@ -28,18 +32,42 @@ const getNGOById = async (req, res, next) => {
 const verifyNGO = async (req, res, next) => {
   try {
     const { status, reason } = req.body;
-    const [ngo] = await pool.query('SELECT user_id, ngo_name FROM ngos WHERE id = ?', [req.params.id]);
-    if (ngo.length === 0) return res.status(404).json({ message: 'NGO not found' });
+    let [ngo] = await pool.query('SELECT id, user_id, ngo_name FROM ngos WHERE id = ?', [req.params.id]);
+    if (!ngo || ngo.length === 0) {
+      [ngo] = await pool.query('SELECT id, user_id, ngo_name FROM ngos WHERE user_id = ?', [req.params.id]);
+    }
+    if (!ngo || ngo.length === 0) return res.status(404).json({ message: 'NGO not found' });
 
     const newVerificationStatus = status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending';
     const userStatus = newVerificationStatus === 'approved' ? 'active' : newVerificationStatus === 'rejected' ? 'rejected' : 'pending';
 
-    await pool.query('UPDATE ngos SET verification_status = ?, rejection_reason = ? WHERE id = ?', [newVerificationStatus, reason || null, req.params.id]);
+    // Update in ngos table
+    await pool.query('UPDATE ngos SET verification_status = ?, rejection_reason = ? WHERE id = ?', [newVerificationStatus, reason || null, ngo[0].id]);
+    await pool.query('UPDATE ngos SET verification_status = ?, rejection_reason = ? WHERE user_id = ?', [newVerificationStatus, reason || null, ngo[0].user_id]);
+
+    // Update in users table
     await pool.query('UPDATE users SET status = ? WHERE id = ?', [userStatus, ngo[0].user_id]);
     if (userStatus === 'active') {
       await pool.query('UPDATE users SET is_email_verified = 1 WHERE id = ?', [ngo[0].user_id]);
     }
-    UserRegistry.updateUserStatus(ngo[0].user_id, userStatus);
+
+    // Update in persistent registry
+    const updatedUser = UserRegistry.updateUserStatus(ngo[0].user_id, userStatus);
+
+    // Persist status change to Cloud Firestore so it survives serverless cold starts
+    try {
+      const [userRows] = await pool.query('SELECT * FROM users WHERE id = ?', [ngo[0].user_id]);
+      const userObj = userRows?.[0] || updatedUser || UserRegistry.findUser(ngo[0].user_id);
+      if (userObj) {
+        userObj.status = userStatus;
+        if (userObj.ngo_details) {
+          userObj.ngo_details.verification_status = newVerificationStatus;
+        }
+        await saveUserToFirestore(userObj);
+      }
+    } catch (fsErr) {
+      console.warn('[NGO:VERIFY] Firestore update note:', fsErr.message);
+    }
 
     const notifTitle = newVerificationStatus === 'approved' ? 'NGO Registration Approved' : 'NGO Registration Rejected';
     const notifMsg = newVerificationStatus === 'approved'

@@ -199,6 +199,12 @@ const UserRegistry = {
       if (status === 'active' || status === 'approved') {
         user.is_email_verified = 1;
       }
+      if (user.role === 'ngo' && user.ngo_details) {
+        user.ngo_details.verification_status = (status === 'active' || status === 'approved') ? 'approved' : (status === 'rejected' ? 'rejected' : 'pending');
+      }
+      if (user.role === 'scrapdealer' && user.scrap_dealer_details) {
+        user.scrap_dealer_details.verification_status = (status === 'active' || status === 'approved') ? 'approved' : (status === 'rejected' ? 'rejected' : 'pending');
+      }
       persistRegistry();
       return user;
     }
@@ -252,14 +258,16 @@ const UserRegistry = {
             const dbUserId = u.id;
 
             if (u.role === 'ngo' && u.ngo_details) {
+              const vStatus = u.ngo_details.verification_status || (u.status === 'active' ? 'approved' : (u.status === 'rejected' ? 'rejected' : 'pending'));
               await pool.query(
                 'INSERT INTO ngos (user_id, ngo_name, contact_person, registration_number, description, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-                [dbUserId, u.ngo_details.ngo_name || u.name, u.ngo_details.contact_person || u.name, u.ngo_details.registration_number || '', u.ngo_details.description || '', u.ngo_details.verification_status || 'approved']
+                [dbUserId, u.ngo_details.ngo_name || u.name, u.ngo_details.contact_person || u.name, u.ngo_details.registration_number || '', u.ngo_details.description || '', vStatus]
               );
             } else if (u.role === 'scrapdealer' && u.scrap_dealer_details) {
+              const vStatus = u.scrap_dealer_details.verification_status || (u.status === 'active' ? 'approved' : (u.status === 'rejected' ? 'rejected' : 'pending'));
               await pool.query(
                 'INSERT INTO scrap_dealers (user_id, business_name, contact_person, registration_number, accepted_materials, verification_status) VALUES (?, ?, ?, ?, ?, ?)',
-                [dbUserId, u.scrap_dealer_details.business_name || u.name, u.scrap_dealer_details.contact_person || u.name, u.scrap_dealer_details.registration_number || '', typeof u.scrap_dealer_details.accepted_materials === 'string' ? u.scrap_dealer_details.accepted_materials : JSON.stringify(u.scrap_dealer_details.accepted_materials || []), u.scrap_dealer_details.verification_status || 'approved']
+                [dbUserId, u.scrap_dealer_details.business_name || u.name, u.scrap_dealer_details.contact_person || u.name, u.scrap_dealer_details.registration_number || '', typeof u.scrap_dealer_details.accepted_materials === 'string' ? u.scrap_dealer_details.accepted_materials : JSON.stringify(u.scrap_dealer_details.accepted_materials || []), vStatus]
               );
             }
           }
